@@ -280,7 +280,7 @@ export class SvgVexFlowBackend extends VexFlowBackend {
 
       /** Inject @font-face rules for music fonts so exported SVGs render correctly. */
       public injectFontCSS(svg: SVGElement): void {
-          const embedding: string = this.rules.SVGFontEmbedding ?? "import";
+          const embedding: string = this.rules.SVGFontEmbedding ?? "inline";
           if (embedding === "none") { return; }
 
           const musicFonts: string[] = ["Bravura", "Gonville", "Petaluma", "Petaluma Script", "Academico"];
@@ -305,17 +305,22 @@ export class SvgVexFlowBackend extends VexFlowBackend {
               if (embedding === "inline") {
                   const dataUri: string | undefined = VF.Font.getFontData(fontName);
                   if (dataUri) {
-                      css += `@font-face { font-family: "${fontName}"; src: url(${dataUri}); font-display: block; }\n`;
+                      // Strip ;charset=utf-8 — breaks CSS url() parsing (OSMD demo does this)
+                      const cleanUri: string = dataUri.replace(";charset=utf-8", "");
+                      css += `@font-face { font-family: "${fontName}"; src: url(${cleanUri}); font-display: swap; }\n`;
                   }
               } else {
                   const cdnUrl: string | undefined = VF.Font.getURLForFont(fontName);
                   if (cdnUrl) {
-                      css += `@font-face { font-family: "${fontName}"; src: url("${cdnUrl}"); font-display: block; }\n`;
+                      css += `@font-face { font-family: "${fontName}"; src: url("${cdnUrl}"); font-display: swap; }\n`;
                   }
               }
           }
 
-          if (!css) { return; }
+          if (!css) {
+              console.warn("[SvgVexFlowBackend] No font CSS generated — fonts will be missing.");
+              return;
+          }
 
           const style: SVGElement = document.createElementNS("http://www.w3.org/2000/svg", "style");
           style.textContent = css;
