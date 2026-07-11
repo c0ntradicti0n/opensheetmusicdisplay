@@ -298,6 +298,13 @@ export class OpenSheetMusicDisplay {
         // Finally, draw
         this.drawer.drawSheet(this.graphic);
 
+        // Inject @font-face into SVG so music fonts render (SVG text needs fonts in SVG scope)
+        for (const backend of this.drawer.Backends) {
+            if (backend instanceof SvgVexFlowBackend) {
+                backend.injectFontCSS(backend.getSvgElement());
+            }
+        }
+
         this.enableOrDisableCursors(this.drawingParameters.drawCursors);
 
         if (this.drawingParameters.drawCursors) {

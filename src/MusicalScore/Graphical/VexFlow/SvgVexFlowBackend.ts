@@ -279,7 +279,7 @@ export class SvgVexFlowBackend extends VexFlowBackend {
     }
 
       /** Inject @font-face rules for music fonts so exported SVGs render correctly. */
-      private injectFontCSS(svg: SVGElement): void {
+      public injectFontCSS(svg: SVGElement): void {
           const embedding: string = this.rules.SVGFontEmbedding ?? "import";
           if (embedding === "none") { return; }
 
