@@ -204,9 +204,13 @@ export class OpenSheetMusicDisplay {
         // }
         log.info(`[OSMD] Loaded sheet ${this.sheet.TitleString} successfully.`);
 
-        // Ensure vexflow fonts are loaded before creating graphical sheet (SVG needs font data)
-        await VF.VexFlow.loadFonts();
-        // Inject CSS @font-face for SVG text rendering — FontFace API alone is insufficient.
+        // Inject CSS @font-face for SVG text rendering — FontFace API alone insufficient for SVG fillText().
+        // entry/vexflow.ts calls Font.load() with data URIs at module load, populating loadedFontData.
+        if (VF.Font.loadedFontData.size === 0) {
+            throw new Error("[OSMD] No bundled font data. SVG rendering will have no glyphs. "
+                + "Ensure vexflow is resolved through entry/vexflow.ts (which imports font data URIs), "
+                + "not src/index.ts (which skips fonts).");
+        }
         for (const [fontName, dataUri] of VF.Font.loadedFontData) {
             const cleanUri: string = dataUri.replace(";charset=utf-8", "");
             const style: HTMLStyleElement = document.createElement("style");
@@ -214,14 +218,7 @@ export class OpenSheetMusicDisplay {
                 `@font-face { font-family: "${fontName}"; src: url("${cleanUri}") format("woff2"); font-display: block; }`;
             document.head.appendChild(style);
         }
-        // Wait for CSS @font-face fonts to be fully loaded before rendering.
         await document.fonts.ready;
-        // Assert fonts were bundled (data URI), not fetched from CDN — SVG needs data URIs.
-        if (VF.Font.loadedFontData.size === 0) {
-            throw new Error("[OSMD] No bundled font data. SVG rendering will have no glyphs. "
-                + "Ensure vexflow is resolved through entry/vexflow.ts (which imports font data URIs), "
-                + "not src/index.ts (which skips fonts).");
-        }
 
         this.needBackendUpdate = true;
         this.updateGraphic();
