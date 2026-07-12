@@ -747,7 +747,18 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                 }
                 textBracket.setContext(ctx);
                 try {
-                    textBracket.draw();
+                    const octShiftId: string | undefined = vexFlowOctaveShift.startNote?.getAttribute("id");
+                    const typeMap: Record<number, string> = { 0: "8va", 1: "8vb", 2: "15ma", 3: "15mb" };
+                    const suffix: string = typeMap[vexFlowOctaveShift.getOctaveShift.Type] || "shift";
+                    if (octShiftId) {
+                        const fullId: string = `${octShiftId}-${suffix}`;
+                        const grp: SVGGElement = (ctx as any).openGroup("octave-shift", `octave-shift-${fullId}`);
+                        grp.setAttribute("data-octave-shift-id", fullId);
+                        textBracket.draw();
+                        (ctx as any).closeGroup();
+                    } else {
+                        textBracket.draw();
+                    }
                 } catch (ex) {
                     log.warn(ex);
                 }
@@ -818,6 +829,12 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
     protected drawInstantaneousDynamic(instantaneousDynamic: GraphicalInstantaneousDynamicExpression): void {
         const label: GraphicalLabel = (instantaneousDynamic as VexFlowInstantaneousDynamicExpression).Label;
         label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
+        if (label.SVGNode) {
+            const dynType: number | undefined = (instantaneousDynamic as any).mInstantaneousDynamicExpression?.DynEnum;
+            if (dynType !== undefined) {
+                (label.SVGNode as Element).setAttribute("data-dynamic-id", "dyn-" + dynType);
+            }
+        }
     }
 
     protected drawContinuousDynamic(graphicalExpression: VexFlowContinuousDynamicExpression): void {
@@ -825,6 +842,10 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             const label: GraphicalLabel = graphicalExpression.Label;
             label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
         } else {
+            const ctx: VF.RenderContext = this.backend.getContext();
+            const wedgeNum: number = (graphicalExpression as any).continuousDynamic?.NumberXml || 0;
+            const wedgeGroup: SVGGElement = (ctx as any).openGroup("wedge", `wedge-${wedgeNum}`);
+            if (wedgeGroup) {wedgeGroup.setAttribute("data-wedge-id", `wedge-${wedgeNum}`);}
             for (const line of graphicalExpression.Lines) {
                 const start: PointF2D = new PointF2D(graphicalExpression.ParentStaffLine.PositionAndShape.AbsolutePosition.x + line.Start.x,
                                                      graphicalExpression.ParentStaffLine.PositionAndShape.AbsolutePosition.y + line.Start.y);
@@ -833,6 +854,7 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                 line.SVGElement = this.drawLine(start, end, line.colorHex ?? "#000000", line.Width);
                 // the null check for colorHex is not strictly necessary anymore, but the previous default color was red.
             }
+            (ctx as any).closeGroup();
         }
     }
 

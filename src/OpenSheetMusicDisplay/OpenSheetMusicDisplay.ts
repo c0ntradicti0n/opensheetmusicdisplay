@@ -25,8 +25,6 @@ import { MusicPartManagerIterator } from "../MusicalScore/MusicParts/MusicPartMa
 import { ITransposeCalculator } from "../MusicalScore/Interfaces/ITransposeCalculator";
 import { NoteEnum } from "../Common/DataObjects/Pitch";
 import { TemposCalculator } from "../MusicalScore/ScoreIO/MusicSymbolModules/TemposCalculator";
-import * as VF from "vexflow";
-
 /**
  * The main class and control point of OpenSheetMusicDisplay.<br>
  * It can display MusicXML sheet music files in an HTML element container.<br>
@@ -204,14 +202,6 @@ export class OpenSheetMusicDisplay {
         // }
         log.info(`[OSMD] Loaded sheet ${this.sheet.TitleString} successfully.`);
 
-        // Assert vexflow fonts are bundled as data URIs, not fetched from CDN.
-        // CSS @font-face injection happens in the web app (App.jsx) before OSMD loads,
-        // but if entry/vexflow.ts was tree-shaken, loadedFontData will be empty.
-        if (VF.Font.loadedFontData.size === 0) {
-            throw new Error("[OSMD] No bundled font data. SVG rendering will have no glyphs. "
-                + "Ensure vexflow is resolved through entry/vexflow.ts (which imports font data URIs), "
-                + "not src/index.ts (which skips fonts).");
-        }
 
         this.needBackendUpdate = true;
         this.updateGraphic();

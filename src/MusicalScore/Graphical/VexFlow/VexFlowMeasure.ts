@@ -74,6 +74,7 @@ export class VexFlowMeasure extends GraphicalMeasure {
     public formatVoices?: (width: number, parent: VexFlowMeasure) => void;
     /** The VexFlow Ties in the measure */
     public vfTies: VF.StaveTie[] = [];
+    private tieNoteIdMap: Map<VF.StaveTie, string> = new Map();
     /** The repetition instructions given as words or symbols (coda, dal segno..) */
     public vfRepetitionWords: VF.Repetition[] = [];
     public hasMetronomeMark: boolean = false;
@@ -150,6 +151,7 @@ export class VexFlowMeasure extends GraphicalMeasure {
 
     public clean(): void {
         this.vfTies.length = 0;
+        this.tieNoteIdMap.clear();
         this.connectors = [];
         // Clean up instructions
         this.resetLayout();
@@ -851,8 +853,37 @@ export class VexFlowMeasure extends GraphicalMeasure {
             }
             tie.setContext(ctx);
             tie.draw();
+            const tieNoteId: string | undefined = this.tieNoteIdMap.get(tie);
+            if (tieNoteId) {
+                const tieEl: HTMLElement | null = document.getElementById("vf-" + tie.getAttribute("id"));
+                if (tieEl) {tieEl.setAttribute("data-tie-id", tieNoteId + "-tie");}
+            }
         }
         ctx.closeGroup(); // close measure group
+
+        // Attach data attributes for editor selection
+        if (typeof document !== "undefined") {
+            const staffIdx: number = (this.ParentStaffLine as any)?.ParentStaff?.idInMusicSheet || 0;
+            const mNum: number = this.MeasureNumber;
+            let clefCount: number = 0;
+            document.querySelectorAll(".vf-clef").forEach((el: Element) => {
+                if (!el.getAttribute("data-clef-id")) {
+                    el.setAttribute("data-clef-id", `clef-m${mNum}-s${staffIdx}-${clefCount++}`);
+                }
+            });
+            let tempoCount: number = 0;
+            document.querySelectorAll(".vf-stavetempo").forEach((el: Element) => {
+                if (!el.getAttribute("data-tempo-id")) {
+                    el.setAttribute("data-tempo-id", `tempo-m${mNum}-s${staffIdx}-${tempoCount++}`);
+                }
+            });
+            let ksCount: number = 0;
+            document.querySelectorAll(".vf-keysignature").forEach((el: Element) => {
+                if (!el.getAttribute("data-key-signature-id")) {
+                    el.setAttribute("data-key-signature-id", `keysig-m${mNum}-${ksCount++}`);
+                }
+            });
+        }
 
         // Draw vertical lines
         for (const connector of this.connectors) {
@@ -2317,6 +2348,9 @@ export class VexFlowMeasure extends GraphicalMeasure {
     public addStaveTie(stavetie: VF.StaveTie, graphicalTie: GraphicalTie): void {
         this.vfTies.push(stavetie);
         graphicalTie.vfTie = stavetie;
+        if ((graphicalTie as any).startNote?.xmlId) {
+            this.tieNoteIdMap.set(stavetie, (graphicalTie as any).startNote.xmlId);
+        }
         if (graphicalTie.Tie.TieDirection === PlacementEnum.Below) {
             (stavetie as any).setDirection(1);
         }
