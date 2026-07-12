@@ -863,8 +863,8 @@ export class VexFlowMeasure extends GraphicalMeasure {
 
         // Attach data attributes for editor selection
         if (typeof document !== "undefined") {
-            const staffIdx: number = (this.ParentStaffLine as any)?.ParentStaff?.idInMusicSheet || 0;
-            const mNum: number = this.MeasureNumber;
+            const staffIdx: number = ((this.ParentStaffLine as any)?.ParentStaff?.idInMusicSheet ?? 0) + 1;
+            const mNum: number = this.parentSourceMeasure?.MeasureNumberXML ?? this.MeasureNumber;
             let clefCount: number = 0;
             document.querySelectorAll(".vf-clef").forEach((el: Element) => {
                 if (!el.getAttribute("data-clef-id")) {

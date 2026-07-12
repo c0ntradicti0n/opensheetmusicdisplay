@@ -1432,7 +1432,7 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
         startStaffEntry = startMeasure.staffEntries[0];
       }
       let endStaffEntry: GraphicalStaffEntry = endMeasure.findGraphicalStaffEntryFromTimestamp(endTimeStamp);
-      if (!endStaffEntry) {
+      if (!endStaffEntry && endTimeStamp) {
         // No exact match (e.g. pending stop with computed inclusive end).
         // Find the latest staff entry at or before the end timestamp.
         for (let i: number = endMeasure.staffEntries.length - 1; i >= 0; i--) {
