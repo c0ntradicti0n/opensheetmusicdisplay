@@ -2348,8 +2348,9 @@ export class VexFlowMeasure extends GraphicalMeasure {
     public addStaveTie(stavetie: VF.StaveTie, graphicalTie: GraphicalTie): void {
         this.vfTies.push(stavetie);
         graphicalTie.vfTie = stavetie;
-        if ((graphicalTie as any).startNote?.xmlId) {
-            this.tieNoteIdMap.set(stavetie, (graphicalTie as any).startNote.xmlId);
+        const tieStartNoteId: string = graphicalTie.StartNote?.sourceNote?.xmlId;
+        if (tieStartNoteId) {
+            this.tieNoteIdMap.set(stavetie, tieStartNoteId);
         }
         if (graphicalTie.Tie.TieDirection === PlacementEnum.Below) {
             (stavetie as any).setDirection(1);
