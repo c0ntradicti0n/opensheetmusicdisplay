@@ -49,6 +49,7 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
     private backends: VexFlowBackend[] = [];
     private zoom: number = 1.0;
     private pageIdx: number = 0; // this is a bad solution, should use MusicPage.PageNumber instead.
+    private dynamicCounter: number = 0;
 
     constructor(drawingParameters: DrawingParameters = new DrawingParameters()) {
         super(new VexFlowTextMeasurer(drawingParameters.Rules), drawingParameters);
@@ -830,10 +831,8 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
         const label: GraphicalLabel = (instantaneousDynamic as VexFlowInstantaneousDynamicExpression).Label;
         label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
         if (label.SVGNode) {
-            const dynType: number | undefined = (instantaneousDynamic as any).mInstantaneousDynamicExpression?.DynEnum;
-            if (dynType !== undefined) {
-                (label.SVGNode as Element).setAttribute("data-dynamic-id", "dyn-" + dynType);
-            }
+            (label.SVGNode as Element).setAttribute("data-dynamic-id", "dyn-" + this.dynamicCounter);
+            this.dynamicCounter++;
         }
     }
 

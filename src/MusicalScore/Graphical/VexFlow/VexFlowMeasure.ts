@@ -841,6 +841,12 @@ export class VexFlowMeasure extends GraphicalMeasure {
                             (vftuplet as any).RenderTupletNumber = true;
                         }
                         vftuplet.setContext(ctx).draw();
+                        const tupletFirstNote: Note = tuplet.Notes[0][0];
+                        const tupletNoteId: string = tupletFirstNote.xmlId ?? tupletFirstNote.computedSvgId();
+                        if (tupletNoteId) {
+                            const tupletEl: HTMLElement | null = document.getElementById("vf-" + vftuplet.getAttribute("id"));
+                            if (tupletEl) {tupletEl.setAttribute("data-tuplet-id", tupletNoteId + "-tuplet");}
+                        }
                     }
                 }
             }
@@ -882,6 +888,17 @@ export class VexFlowMeasure extends GraphicalMeasure {
                 if (!el.getAttribute("data-key-signature-id")) {
                     el.setAttribute("data-key-signature-id", `keysig-m${mNum}-${ksCount++}`);
                 }
+            });
+            const ornCountByNote: Map<string, number> = new Map();
+            document.querySelectorAll(".vf-articulation, .vf-ornament").forEach((el: Element) => {
+                if (el.getAttribute("data-ornament-id")) { return; }
+                const noteEl: Element | null = el.closest("[data-note-id]");
+                if (!noteEl) { return; }
+                const noteId: string | null = noteEl.getAttribute("data-note-id");
+                if (!noteId) { return; }
+                const count: number = ornCountByNote.get(noteId) || 0;
+                el.setAttribute("data-ornament-id", `orn-${noteId}-${count}`);
+                ornCountByNote.set(noteId, count + 1);
             });
         }
 
