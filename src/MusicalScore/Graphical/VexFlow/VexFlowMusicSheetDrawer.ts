@@ -34,7 +34,7 @@ import { VexFlowGlissando } from "./VexFlowGlissando";
 import { VexFlowGraphicalNote } from "./VexFlowGraphicalNote";
 import { SvgVexFlowBackend } from "./SvgVexFlowBackend";
 import { VexFlowVibratoBracket } from "./VexFlowVibratoBracket";
-import { TremoloBetweenNotes } from "../../VoiceData/Note";
+import { Note, TremoloBetweenNotes } from "../../VoiceData/Note";
 import { SkyBottomLineCalculator } from "../SkyBottomLineCalculator";
 
 /**
@@ -50,6 +50,7 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
     private zoom: number = 1.0;
     private pageIdx: number = 0; // this is a bad solution, should use MusicPage.PageNumber instead.
     private dynamicCounter: number = 0;
+    private pedalCounter: number = 0;
 
     constructor(drawingParameters: DrawingParameters = new DrawingParameters()) {
         super(new VexFlowTextMeasurer(drawingParameters.Rules), drawingParameters);
@@ -716,6 +717,13 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             label.Label.colorDefault = this.rules.DefaultColorLyrics;
             label.SVGNode = this.drawLabel(label, layer);
             (label.SVGNode as SVGGElement)?.classList.add("lyrics");
+            // Attach data-lyric-id for editor selection: <noteId>-lyric-<verse>
+            const lyricNote: Note = lyricsEntry.LyricsEntry?.Parent?.Notes[0];
+            const lyricNoteId: string = lyricNote?.xmlId ?? lyricNote?.computedSvgId();
+            if (lyricNoteId && label.SVGNode) {
+                const verse: string = lyricsEntry.LyricsEntry.VerseNumber || "1";
+                (label.SVGNode as Element).setAttribute("data-lyric-id", `${lyricNoteId}-lyric-${verse}`);
+            }
         });
     }
 
@@ -754,7 +762,9 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                     if (octShiftId) {
                         const fullId: string = `${octShiftId}-${suffix}`;
                         const grp: SVGGElement = (ctx as any).openGroup("octave-shift", `octave-shift-${fullId}`);
-                        grp.setAttribute("data-octave-shift-id", fullId);
+                        if (grp) {
+                            grp.setAttribute("data-octave-shift-id", fullId);
+                        }
                         textBracket.draw();
                         (ctx as any).closeGroup();
                     } else {
@@ -772,10 +782,14 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             if (graphicalPedal) {
                 const vexFlowPedal: VexFlowPedal = graphicalPedal as VexFlowPedal;
                 const ctx: VF.RenderContext = this.backend.getContext();
+                const pedalId: string = `pedal-${++this.pedalCounter}`;
+                const pedalGroup: SVGGElement = (ctx as any).openGroup("pedal", pedalId);
+                if (pedalGroup) { pedalGroup.setAttribute("data-pedal-id", pedalId); }
                 const pedalMarking: VF.PedalMarking = vexFlowPedal.getPedalMarking();
                 (pedalMarking as any).renderOptions.color = this.rules.DefaultColorMusic;
                 pedalMarking.setContext(ctx);
                 pedalMarking.draw();
+                (ctx as any).closeGroup();
             }
         }
     }
