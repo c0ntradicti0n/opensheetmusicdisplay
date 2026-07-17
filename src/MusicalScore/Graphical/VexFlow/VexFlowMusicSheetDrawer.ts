@@ -51,6 +51,7 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
     private pageIdx: number = 0; // this is a bad solution, should use MusicPage.PageNumber instead.
     private dynamicCounter: number = 0;
     private pedalCounter: number = 0;
+    private chordCounter: number = 0;
 
     constructor(drawingParameters: DrawingParameters = new DrawingParameters()) {
         super(new VexFlowTextMeasurer(drawingParameters.Rules), drawingParameters);
@@ -697,6 +698,10 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             for (const graphicalChordContainer of staffEntry.graphicalChordContainers) {
                 const label: GraphicalLabel = graphicalChordContainer.GraphicalLabel;
                 label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
+                if (label.SVGNode) {
+                    const chordId: string = `chord-${++this.chordCounter}`;
+                    (label.SVGNode as SVGElement).setAttribute("data-chord-id", chordId);
+                }
             }
         }
         if (this.rules.RenderLyrics) {
