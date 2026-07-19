@@ -699,7 +699,11 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                 const label: GraphicalLabel = graphicalChordContainer.GraphicalLabel;
                 label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
                 if (label.SVGNode) {
-                    const measureNum: number = staffEntry.parentMeasure.MeasureNumber;
+                    // Use printed measure number (XML number attribute when integer,
+                    // falling back to sequential MeasureNumber). This ensures the
+                    // chord ID matches the XML measure[number] attribute across
+                    // sliced/full score contexts.
+                    const measureNum: number = staffEntry.parentMeasure.parentSourceMeasure.getPrintedMeasureNumber();
                     const idx: number = this.chordPerMeasureCounter.get(measureNum) ?? 0;
                     this.chordPerMeasureCounter.set(measureNum, idx + 1);
                     const chordId: string = `chord-m${measureNum}-${idx}`;
