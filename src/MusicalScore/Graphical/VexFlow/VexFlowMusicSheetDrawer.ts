@@ -689,8 +689,24 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
 
     private drawStaffEntry(staffEntry: GraphicalStaffEntry): void {
         if (staffEntry.FingeringEntries.length > 0) {
-            for (const fingeringEntry of staffEntry.FingeringEntries) {
+            // Get note ID from the staff entry's first pitched note for data-fingering-id.
+            // Fingerings belong to the top note of the chord in OSMD's model.
+            let fingeringNoteId: string = "";
+            for (const gve of staffEntry.graphicalVoiceEntries) {
+                for (const note of gve.notes) {
+                    if (note.sourceNote.xmlId) {
+                        fingeringNoteId = note.sourceNote.xmlId;
+                        break;
+                    }
+                }
+                if (fingeringNoteId) { break; }
+            }
+            for (let i: number = 0; i < staffEntry.FingeringEntries.length; i++) {
+                const fingeringEntry: GraphicalLabel = staffEntry.FingeringEntries[i];
                 fingeringEntry.SVGNode = this.drawLabel(fingeringEntry, GraphicalLayers.Notes);
+                if (fingeringEntry.SVGNode && fingeringNoteId) {
+                    (fingeringEntry.SVGNode as SVGElement).setAttribute("data-fingering-id", `fingering-${fingeringNoteId}-${i}`);
+                }
             }
         }
         // Draw ChordSymbols
