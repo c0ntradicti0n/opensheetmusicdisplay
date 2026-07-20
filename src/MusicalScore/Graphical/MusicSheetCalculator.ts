@@ -3412,51 +3412,70 @@ export abstract class MusicSheetCalculator {
                                 // || fingerings[0].sourceNote === topNote && placement === PlacementEnum.Below && isBulkFingering // doesn't seem necessary
                                 // TODO more elegant solution: order fingerings in the order of each individual note.
                                 //   this is already a rare situation though, would be even more rare for this to matter, and more complex.
-                                fingerings.reverse();
+                                // Don't reverse substitution pairs — non-subst stays left, subst on right for horizontal layout.
+                                if (!(fingerings.length >= 2 && fingerings.some(f => f.substitution))) {
+                                    fingerings.reverse();
+                                }
                             }
                         }
                         for (let i: number = 0; i < fingerings.length; i++) {
                             const fingering: TechnicalInstruction = fingerings[i];
+                            // Per-fingering placement overrides measure-level placement.
+                            const fingerPlacement: PlacementEnum =
+                                fingering.placement !== undefined && fingering.placement !== PlacementEnum.NotYetDefined
+                                    ? fingering.placement : placement;
+                            const isAbove: boolean = fingerPlacement === PlacementEnum.Above;
                             const alignment: TextAlignmentEnum =
-                                placement === PlacementEnum.Above ? TextAlignmentEnum.CenterBottom : TextAlignmentEnum.CenterTop;
+                                isAbove ? TextAlignmentEnum.CenterBottom : TextAlignmentEnum.CenterTop;
                             const label: Label = new Label(fingering.value, alignment);
                             const gLabel: GraphicalLabel = new GraphicalLabel(
                                 label, this.rules.FingeringTextSize, label.textAlignment, this.rules, line.PositionAndShape);
                             if (fingering.fontFamily) {
                                 label.fontFamily = fingering.fontFamily;
                             }
+                            gLabel.isSubstitution = fingering.substitution;
                             const marginLeft: number = staffEntryPositionX + gLabel.PositionAndShape.BorderMarginLeft;
                             const marginRight: number = staffEntryPositionX + gLabel.PositionAndShape.BorderMarginRight;
                             let skybottomFurthest: number = undefined;
-                            if (placement === PlacementEnum.Above) {
+                            if (isAbove) {
                                 skybottomFurthest = skybottomcalculator.getSkyLineMinInRange(marginLeft, marginRight);
                             } else {
                                 skybottomFurthest = skybottomcalculator.getBottomLineMaxInRange(marginLeft, marginRight);
                             }
                             let yShift: number = 0;
-                            if (i === 0) {
+                            if (fingering.substitution && gse.FingeringEntries.length > 0) {
+                                // Substitution: same vertical level as first label, horizontal offset
+                                yShift = 0;
+                            } else if (i === 0) {
                                 yShift += this.rules.FingeringOffsetY;
-                                if (placement === PlacementEnum.Above) {
+                                if (isAbove) {
                                     yShift += 0.1; // above fingerings are a bit closer to the notes than below ones for some reason
                                 }
                             } else {
                                 yShift += this.rules.FingeringPaddingY;
                             }
-                            if (placement === PlacementEnum.Above) {
+                            if (isAbove) {
                                 yShift *= -1;
                             }
-                            gLabel.PositionAndShape.RelativePosition.y += skybottomFurthest + yShift;
-                            gLabel.PositionAndShape.RelativePosition.x = staffEntryPositionX;
+                            if (fingering.substitution && gse.FingeringEntries.length > 0) {
+                                const prevLabel: GraphicalLabel = gse.FingeringEntries[gse.FingeringEntries.length - 1];
+                                const xOffset: number = prevLabel.PositionAndShape.Size.width + 0.2;
+                                gLabel.PositionAndShape.RelativePosition.x = staffEntryPositionX + xOffset;
+                                gLabel.PositionAndShape.RelativePosition.y = prevLabel.PositionAndShape.RelativePosition.y;
+                            } else {
+                                gLabel.PositionAndShape.RelativePosition.y += skybottomFurthest + yShift;
+                                gLabel.PositionAndShape.RelativePosition.x = staffEntryPositionX;
+                            }
                             gLabel.setLabelPositionAndShapeBorders();
                             gLabel.PositionAndShape.calculateBoundingBox();
                             gse.FingeringEntries.push(gLabel);
                             const start: number = gLabel.PositionAndShape.RelativePosition.x + gLabel.PositionAndShape.BorderLeft;
                             //start -= line.PositionAndShape.RelativePosition.x;
                             const end: number = start - gLabel.PositionAndShape.BorderLeft + gLabel.PositionAndShape.BorderRight;
-                            if (placement === PlacementEnum.Above) {
+                            if (isAbove) {
                                 skybottomcalculator.updateSkyLineInRange(
                                     start, end, gLabel.PositionAndShape.RelativePosition.y + gLabel.PositionAndShape.BorderTop); // BorderMarginTop too much
-                            } else if (placement === PlacementEnum.Below) {
+                            } else {
                                 skybottomcalculator.updateBottomLineInRange(
                                     start, end, gLabel.PositionAndShape.RelativePosition.y + gLabel.PositionAndShape.BorderBottom);
                             }

@@ -889,8 +889,19 @@ export class VexFlowMeasure extends GraphicalMeasure {
                     el.setAttribute("data-key-signature-id", `keysig-m${mNum}-${ksCount++}`);
                 }
             });
+            const artCountByNote: Map<string, number> = new Map();
+            document.querySelectorAll(".vf-articulation").forEach((el: Element) => {
+                if (el.getAttribute("data-articulation-id")) { return; }
+                const noteEl: Element | null = el.closest("[data-note-id]");
+                if (!noteEl) { return; }
+                const noteId: string | null = noteEl.getAttribute("data-note-id");
+                if (!noteId) { return; }
+                const count: number = artCountByNote.get(noteId) || 0;
+                el.setAttribute("data-articulation-id", `art-${noteId}-${count}`);
+                artCountByNote.set(noteId, count + 1);
+            });
             const ornCountByNote: Map<string, number> = new Map();
-            document.querySelectorAll(".vf-articulation, .vf-ornament").forEach((el: Element) => {
+            document.querySelectorAll(".vf-ornament").forEach((el: Element) => {
                 if (el.getAttribute("data-ornament-id")) { return; }
                 const noteEl: Element | null = el.closest("[data-note-id]");
                 if (!noteEl) { return; }
@@ -899,6 +910,17 @@ export class VexFlowMeasure extends GraphicalMeasure {
                 const count: number = ornCountByNote.get(noteId) || 0;
                 el.setAttribute("data-ornament-id", `orn-${noteId}-${count}`);
                 ornCountByNote.set(noteId, count + 1);
+            });
+            const accCountByNote: Map<string, number> = new Map();
+            document.querySelectorAll(".vf-accidental").forEach((el: Element) => {
+                if (el.getAttribute("data-accidental-id")) { return; }
+                const noteEl: Element | null = el.closest("[data-note-id]");
+                if (!noteEl) { return; }
+                const noteId: string | null = noteEl.getAttribute("data-note-id");
+                if (!noteId) { return; }
+                const count: number = accCountByNote.get(noteId) || 0;
+                el.setAttribute("data-accidental-id", `acc-${noteId}-${count}`);
+                accCountByNote.set(noteId, count + 1);
             });
         }
 

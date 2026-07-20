@@ -18,7 +18,7 @@ import {ITextTranslation} from "../../Interfaces/ITextTranslation";
 import log from "loglevel";
 import { FontStyles } from "../../../Common/Enums/FontStyles";
 import { RehearsalExpression } from "../../VoiceData/Expressions/RehearsalExpression";
-import { Pedal } from "../../VoiceData/Expressions/ContinuousExpressions/Pedal";
+import { Pedal, PedalType } from "../../VoiceData/Expressions/ContinuousExpressions/Pedal";
 import { WavyLine } from "../../VoiceData/Expressions/ContinuousExpressions/WavyLine";
 
 export class ExpressionReader {
@@ -424,6 +424,20 @@ export class ExpressionReader {
                             }
                             this.createNewMultiExpressionIfNeeded(currentMeasure, -1);
                             this.openPedal = new Pedal(line, sign);
+                            this.getMultiExpression.PedalStart = this.openPedal;
+                            this.openPedal.ParentStartMultiExpression = this.getMultiExpression;
+                        break;
+                        case "sostenuto":
+                        case "soft":
+                            // Non-standard but widely used: e.g. MuseScore exports
+                            // <pedal type="sostenuto" line="yes"/> and <pedal type="soft" line="yes"/>.
+                            // Treat like "start" but tag with the appropriate pedal kind for rendering.
+                            if (this.openPedal && this.openPedal.IsLine) {
+                                this.endOpenPedal(currentMeasure);
+                            }
+                            this.createNewMultiExpressionIfNeeded(currentMeasure, -1);
+                            this.openPedal = new Pedal(line, sign,
+                                pedalNode.attribute("type").value === "soft" ? PedalType.Soft : PedalType.Sostenuto);
                             this.getMultiExpression.PedalStart = this.openPedal;
                             this.openPedal.ParentStartMultiExpression = this.getMultiExpression;
                         break;

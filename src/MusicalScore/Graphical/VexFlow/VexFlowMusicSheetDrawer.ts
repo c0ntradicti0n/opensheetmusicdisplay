@@ -708,6 +708,7 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                     (fingeringEntry.SVGNode as SVGElement).setAttribute("data-fingering-id", `fingering-${fingeringNoteId}-${i}`);
                 }
             }
+            this.drawFingeringSubstitutionSlur(staffEntry.FingeringEntries);
         }
         // Draw ChordSymbols
         if (staffEntry.graphicalChordContainers !== undefined && staffEntry.graphicalChordContainers.length > 0) {
@@ -732,6 +733,66 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                 this.drawLyrics(staffEntry.LyricsEntries, <number>GraphicalLayers.Notes);
             }
         }
+    }
+
+    /**
+     * Draw a small slur connecting a substitution fingering to its adjacent sibling.
+     * The curve appears on the left side of the stacked fingerings.
+     */
+    private drawFingeringSubstitutionSlur(fingeringEntries: GraphicalLabel[]): void {
+        if (fingeringEntries.length < 2) {
+            return;
+        }
+        let subIdx: number = -1;
+        for (let i: number = 0; i < fingeringEntries.length; i++) {
+            if (fingeringEntries[i].isSubstitution) {
+                subIdx = i;
+                break;
+            }
+        }
+        if (subIdx <= 0) {
+            return;
+        }
+        // subIdx > 0: non-substitution label is at subIdx - 1 (left),
+        // substitution label at subIdx (right) — horizontal layout.
+        const leftLabel: GraphicalLabel = fingeringEntries[subIdx - 1];
+        const rightLabel: GraphicalLabel = fingeringEntries[subIdx];
+        const leftAbs: PointF2D = leftLabel.PositionAndShape.AbsolutePosition;
+        const rightAbs: PointF2D = rightLabel.PositionAndShape.AbsolutePosition;
+
+        // Use the label's SVG text element y (baseline) for curve positioning.
+        // label.SVGNode is set by drawLabel call before this runs.
+        let baselineY: number = leftAbs.y * unitInPixels;
+        if (leftLabel.SVGNode) {
+            const textEl: SVGElement | null = (leftLabel.SVGNode as SVGElement).querySelector("text");
+            if (textEl) {
+                baselineY = parseFloat(textEl.getAttribute("y") ?? String(baselineY));
+            }
+        }
+        // Curve attaches ~9px above baseline, arch ~15px above baseline (Above).
+        // For Below (CenterTop), drawLabel doesn't shift baseline, so same offsets work.
+        const attachPx: number = baselineY - 11;
+        const archPx: number = baselineY - 14;
+        const attachY: number = attachPx / unitInPixels;
+        const archY: number = archPx / unitInPixels;
+        const gapX: number = (rightAbs.x - leftAbs.x) * 0.35;
+
+        const endThick: number = 0.015;
+        const ctrlThick: number = 0.06;
+        const p0: PointF2D = new PointF2D(leftAbs.x, attachY);
+        const p1: PointF2D = new PointF2D(leftAbs.x + gapX, archY);
+        const p2: PointF2D = new PointF2D(rightAbs.x - gapX, archY);
+        const p3: PointF2D = new PointF2D(rightAbs.x, attachY);
+
+        const pts: PointF2D[] = [
+            p0, p1, p2, p3,
+            new PointF2D(p3.x, p3.y - endThick),
+            new PointF2D(p2.x, p2.y - ctrlThick),
+            new PointF2D(p1.x, p1.y - ctrlThick),
+            new PointF2D(p0.x, p0.y - endThick),
+        ];
+        const pixelPts: PointF2D[] = pts.map((p: PointF2D) => this.applyScreenTransformation(p));
+        this.backend.renderCurve(pixelPts);
     }
 
     /**
@@ -884,7 +945,7 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
         } else {
             const ctx: VF.RenderContext = this.backend.getContext();
-            const wedgeNum: number = (graphicalExpression as any).continuousDynamic?.NumberXml || 0;
+            const wedgeNum: number = graphicalExpression.ContinuousDynamic?.NumberXml || 0;
             const wedgeGroup: SVGGElement = (ctx as any).openGroup("wedge", `wedge-${wedgeNum}`);
             if (wedgeGroup) {wedgeGroup.setAttribute("data-wedge-id", `wedge-${wedgeNum}`);}
             for (const line of graphicalExpression.Lines) {

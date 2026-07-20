@@ -1,13 +1,22 @@
 import { MultiExpression } from "../MultiExpression";
 
+/** MusicXML pedal type — distinguishes damper/sustain, sostenuto, and soft (una corda). */
+export enum PedalType {
+    Sustain = "sustain",
+    Sostenuto = "sostenuto",
+    Soft = "soft",
+}
+
 export class Pedal {
-    constructor(line: boolean = false, sign: boolean = true) {
+    constructor(line: boolean = false, sign: boolean = true, pedalType: PedalType = PedalType.Sustain) {
         this.line = line;
         this.sign = sign;
+        this.pedalType = pedalType;
     }
 
     private line: boolean;
     private sign: boolean;
+    public pedalType: PedalType;
     public StaffNumber: number;
     public ParentStartMultiExpression: MultiExpression;
     public ParentEndMultiExpression: MultiExpression;

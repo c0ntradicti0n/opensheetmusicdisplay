@@ -3,7 +3,7 @@ import { BoundingBox } from "../BoundingBox";
 import { GraphicalStaffEntry } from "../GraphicalStaffEntry";
 import { VexFlowVoiceEntry } from "./VexFlowVoiceEntry";
 import { GraphicalPedal } from "../GraphicalPedal";
-import { Pedal } from "../../VoiceData/Expressions/ContinuousExpressions/Pedal";
+import { Pedal, PedalType } from "../../VoiceData/Expressions/ContinuousExpressions/Pedal";
 import { MusicSymbol } from "../MusicSymbol";
 import { GraphicalMeasure } from "../GraphicalMeasure";
 import { VexFlowMeasure } from "./VexFlowMeasure";
@@ -39,6 +39,14 @@ export class VexFlowPedal extends GraphicalPedal {
         super(pedal, parent);
         this.ChangeBegin = pedal.ChangeBegin;
         this.ChangeEnd = pedal.ChangeEnd;
+        // Set pedal text based on type (default "Ped." for sustain/damper)
+        if (pedal.pedalType === PedalType.Sostenuto) {
+            this.DepressText = "Sost.";
+            this.ReleaseText = "*";
+        } else if (pedal.pedalType === PedalType.Soft) {
+            this.DepressText = "U.C.";
+            this.ReleaseText = "*";
+        }
         switch (this.pedalSymbol) {
             case MusicSymbol.PEDAL_SYMBOL:
                 //This renders the pedal symbols in VF.
