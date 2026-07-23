@@ -48,6 +48,7 @@ function sleep (ms) {
 let [osmdBuildDir, sampleDir, imageDir, imageFormat, pageWidth, pageHeight, filterRegex, mode, debugSleepTimeString, skyBottomLinePreference] = process.argv.slice(2, 12);
 const dumpPositions = process.argv.includes("--dump-positions");
 const showSkyline = process.argv.includes("--show-skyline");
+const hideMetronome = process.argv.includes("--hide-metronome");
 imageFormat = imageFormat?.toLowerCase();
 const formats = imageFormat ? imageFormat.split(",").filter(Boolean).map(f => f === "svg-inline" ? "inline-svg" : f) : [];
 if (!osmdBuildDir || !sampleDir || !imageDir || formats.length === 0 || !formats.every(f => f === "png" || f === "svg" || f === "inline-svg")) {
@@ -257,6 +258,16 @@ async function generateSampleImage (sampleFilename, directory, osmdInstance, osm
 
     if (osmdTestMode) {
         options = setOsmdTestOptionsBeforeLoad(sampleFilename, options, osmdInstance);
+    }
+
+    if (hideMetronome) {
+        osmdInstance.setOptions({
+            drawMetronomeMarks: false,
+            drawTitle: false,
+            drawSubtitle: false,
+            drawComposer: false,
+            drawPartNames: false,
+        });
     }
 
     try {
