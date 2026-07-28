@@ -180,14 +180,14 @@ export class GraphicalSlur extends GraphicalCurve {
         // fallback. For all slurs, replaces the old maxY override which was
         // mathematically wrong (cp_y=obstacle_Y gives bezier height < obstacle_Y).
         this.mergedClearanceCpY = -Infinity;
+        const chordDx: number = endX - startX;
+        const chordDy: number = endY - startY;
+        const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
+        const minT: number = 0.15;
+        const maxT: number = 0.85;
+        const noteCount: number = this.staffEntries.length;
+        const maxMult: number = noteCount <= 3 ? 1.5 : Math.max(0.6, 1.5 - (noteCount - 3) / 7 * 0.9);
         if (isAbove) {
-            const chordDx: number = endX - startX;
-            const chordDy: number = endY - startY;
-            const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
-            const minT: number = 0.15;
-            const maxT: number = 0.85;
-            const noteCount: number = this.staffEntries.length;
-            const maxMult: number = noteCount <= 3 ? 1.5 : Math.max(0.6, 1.5 - (noteCount - 3) / 7 * 0.9);
             const startI: number = this.slur?.isCrossed() ? localPointCount : 0;
             for (let i: number = startI; i < points.length; i++) {
                 const orig: PointF2D = points[i];
@@ -212,6 +212,27 @@ export class GraphicalSlur extends GraphicalCurve {
                 const gapMinCpY: number = staffGap * 0.7;
                 if (this.mergedClearanceCpY < gapMinCpY) {
                     this.mergedClearanceCpY = gapMinCpY;
+                }
+            }
+        } else {
+            // Below placement: clear obstacles below chord (bottom line).
+            // Same per-point formula as above, but negated (cpY goes below chord).
+            this.mergedClearanceCpY = Infinity;
+            for (let i: number = 0; i < points.length; i++) {
+                const orig: PointF2D = points[i];
+                const dx: number = orig.x - startX;
+                const dy: number = orig.y - startY;
+                const tOrig: number = (dx * chordDx + dy * chordDy) / chordLenSq;
+                if (tOrig < minT || tOrig > maxT) { continue; }
+                const trans: PointF2D = transformedPoints[i];
+                if (trans.y <= 0) { continue; }
+                const needed: number = Math.min(
+                    trans.y / (3 * tOrig * (1 - tOrig)),
+                    trans.y * maxMult,
+                );
+                const neededBelow: number = -needed;
+                if (neededBelow < this.mergedClearanceCpY) {
+                    this.mergedClearanceCpY = neededBelow;
                 }
             }
         }
@@ -576,6 +597,9 @@ export class GraphicalSlur extends GraphicalCurve {
         // Lift CPs above obstacles. mergedClearanceCpY is pre-computed in
         // calculateCurve per-point with original t (accounts for bezier fraction).
         if (this.placement === PlacementEnum.Above && this.mergedClearanceCpY > leftCp.y) {
+            leftCp.y = this.mergedClearanceCpY;
+            rightCp.y = this.mergedClearanceCpY;
+        } else if (this.placement === PlacementEnum.Below && this.mergedClearanceCpY < leftCp.y) {
             leftCp.y = this.mergedClearanceCpY;
             rightCp.y = this.mergedClearanceCpY;
         }
