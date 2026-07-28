@@ -186,7 +186,8 @@ export class GraphicalSlur extends GraphicalCurve {
             const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
             const minT: number = 0.15;
             const maxT: number = 0.85;
-            const maxMult: number = 1.5;
+            const noteCount: number = this.staffEntries.length;
+            const maxMult: number = noteCount <= 3 ? 1.5 : Math.max(0.6, 1.5 - (noteCount - 3) / 7 * 0.9);
             const startI: number = this.slur?.isCrossed() ? localPointCount : 0;
             for (let i: number = startI; i < points.length; i++) {
                 const orig: PointF2D = points[i];
