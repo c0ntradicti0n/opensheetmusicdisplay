@@ -499,22 +499,6 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
             }
           }
         }
-        // Sync noteStartX from the (correct) saved staves to the measures'
-        // current staves, which may have been replaced by resetLayout()
-        // after stavesForMeasureColumn was captured. At draw time
-        // Note.getAbsoluteX() adds stave.getNoteStartX() to tickContext
-        // X, so unsynced staves produce different x positions for notes
-        // at the same rhythmic position on different staves.
-        if (stavesForMeasureColumn.length > 1) {
-          const maxStartX: number = stavesForMeasureColumn[0].getNoteStartX();
-          for (const m of visibleMeasures) {
-            if (!m?.isVisible()) { continue; }
-            const ms: VF.Stave = (m as VexFlowMeasure).getVFStave();
-            if (ms && ms.getNoteStartX() !== maxStartX) {
-              ms.setNoteStartX(maxStartX);
-            }
-          }
-        }
       };
 
       const formatVoicesDefault: (w: number, p: VexFlowMeasure) => void = (w, p) => {
