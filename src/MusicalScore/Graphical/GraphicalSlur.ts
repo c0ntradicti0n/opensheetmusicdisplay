@@ -147,6 +147,49 @@ export class GraphicalSlur extends GraphicalCurve {
             }
             this.debugSkyPoints = points.map((p: PointF2D) => new PointF2D(p.x, p.y));
             this.debugSkyCategories = points.map((_) => "skyline");
+
+            // Inject notehead/stem obstacle points from ALL notes in all measures
+            // overlapping the slur's X range (not just same-voice staffEntries).
+            // Pixel-based skyline misses noteheads far above the staff (ledger lines)
+            // and notes in other voices on the same staff.
+            for (const gm of staffLine.Measures) {
+                const mRelX: number = gm.PositionAndShape?.RelativePosition?.x ?? 0;
+                for (const gse of gm.staffEntries) {
+                    if (!gse.graphicalVoiceEntries) { continue; }
+                    for (const gve2 of gse.graphicalVoiceEntries as any[]) {
+                        const vfNote2: any = gve2.vfStaveNote;
+                        if (!vfNote2 || typeof vfNote2.getKeyProps !== "function") { continue; }
+                        const vfStave2: any = vfNote2.getStave?.();
+                        if (!vfStave2) { continue; }
+                        const kps2: any[] = vfNote2.getKeyProps();
+                        if (!kps2 || kps2.length === 0) { continue; }
+                        const gvex2: number = gve2.PositionAndShape?.RelativePosition?.x;
+                        if (gvex2 === undefined || gvex2 === null) { continue; }
+                        const entryRelX2: number = gse.PositionAndShape?.RelativePosition?.x ?? 0;
+                        const noteX2: number = gvex2 + entryRelX2 + mRelX;
+                        if (noteX2 < Math.min(startX, endX) || noteX2 > Math.max(startX, endX)) { continue; }
+                        const vfStaveY2: number = vfStave2.getY();
+                        // Check each notehead in the chord
+                        for (const kp of kps2) {
+                            const noteYPx2: number = vfStave2.getYForLine(kp.line);
+                            const noteY2: number = (noteYPx2 - vfStaveY2) / unitInPixels;
+                            if (isAbove && noteY2 < startY) {
+                                points.push(new PointF2D(noteX2, noteY2));
+                            } else if (!isAbove && noteY2 > startY) {
+                                points.push(new PointF2D(noteX2, noteY2));
+                            }
+                        }
+                        // Also inject stem tip/base
+                        if (typeof vfNote2.hasStem === "function" && vfNote2.hasStem() && typeof vfNote2.getStemExtents === "function") {
+                            const stem2: any = vfNote2.getStemExtents();
+                            const stTipY2: number = (stem2.topY - vfStaveY2) / unitInPixels;
+                            const stBaseY2: number = (stem2.baseY - vfStaveY2) / unitInPixels;
+                            if (isAbove && stTipY2 < startY) { points.push(new PointF2D(noteX2, stTipY2)); }
+                            if (!isAbove && stBaseY2 > startY) { points.push(new PointF2D(noteX2, stBaseY2)); }
+                        }
+                    }
+                }
+            }
         } else {
             points = this.calculateBottomPoints(new PointF2D(startX, startY), new PointF2D(endX, endY), staffLine, skyBottomLineCalculator);
             localPointCount = points.length;
