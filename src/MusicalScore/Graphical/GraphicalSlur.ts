@@ -28,6 +28,8 @@ export class GraphicalSlur extends GraphicalCurve {
     public debugSkyPoints: PointF2D[] = [];
     /** Labels for each debug obstacle point. */
     public debugSkyCategories: string[] = [];
+    /** Minimum cp_y from cross-staff merged-obstacle clearance. */
+    private mergedClearanceCpY: number = -Infinity;
 
     constructor(slur: Slur, rules?: EngravingRules) {
         super();
@@ -91,59 +93,38 @@ export class GraphicalSlur extends GraphicalCurve {
         let endY: number = startEndPoints.endY;
         const minAngle: number = rules.SlurTangentMinAngle;
         const maxAngle: number = rules.SlurTangentMaxAngle;
-        let start: PointF2D, end: PointF2D;
         let points: PointF2D[];
+        let localPointCount: number = 0;
 
-        if (this.placement === PlacementEnum.Above) {
-            startY -= rules.SlurNoteHeadYOffset;
-            endY -= rules.SlurNoteHeadYOffset;
-            start = new PointF2D(startX, startY);
-            end = new PointF2D(endX, endY);
-            const startUpperRight: PointF2D = new PointF2D(this.staffEntries[0].parentMeasure.PositionAndShape.RelativePosition.x
-                                                           + this.staffEntries[0].PositionAndShape.RelativePosition.x,
-                                                           startY);
-            if (slurStartNote !== undefined) {
-                    startUpperRight.x += this.staffEntries[0].PositionAndShape.BorderRight;
-            } else  {
-                    // continuing Slur from previous StaffLine - must start after last Instruction of first Measure
-                    startUpperRight.x = this.staffEntries[0].parentMeasure.beginInstructionsWidth;
-            }
+        const isAbove: boolean = this.placement === PlacementEnum.Above;
+        const yDir: number = isAbove ? -1 : 1; // flip Y for Above (skyline negative, transform negates)
+        const rotDir: number = isAbove ? 1 : -1; // rotation sign
+        startY += yDir * rules.SlurNoteHeadYOffset;
+        endY += yDir * rules.SlurNoteHeadYOffset;
+        const slurStart: PointF2D = new PointF2D(startX, startY);
+        const slurEnd: PointF2D = new PointF2D(endX, endY);
 
-            // must also add the GraceStaffEntry's ParentStaffEntry Position
-            if (this.graceStart) {
-                startUpperRight.x += endStaffEntry.PositionAndShape.RelativePosition.x;
-            }
-
-            const endUpperLeft: PointF2D = new PointF2D(this.staffEntries[this.staffEntries.length - 1].parentMeasure.PositionAndShape.RelativePosition.x
-                                                        + this.staffEntries[this.staffEntries.length - 1].PositionAndShape.RelativePosition.x,
-                                                        endY);
-            if (slurEndNote !== undefined) {
-                    endUpperLeft.x += this.staffEntries[this.staffEntries.length - 1].PositionAndShape.BorderLeft;
-            } else {
-                    // Slur continues to next StaffLine - must reach the end of current StaffLine
-                    endUpperLeft.x = this.staffEntries[this.staffEntries.length - 1].parentMeasure.PositionAndShape.RelativePosition.x
-                    + this.staffEntries[this.staffEntries.length - 1].parentMeasure.PositionAndShape.Size.width;
-            }
-
-            // must also add the GraceStaffEntry's ParentStaffEntry Position
-            if (this.graceEnd) {
-                endUpperLeft.x += endStaffEntry.staffEntryParent.PositionAndShape.RelativePosition.x;
-            }
-
-            // SkyLinePointsList between firstStaffEntry startUpperRightPoint and lastStaffentry endUpperLeftPoint
-            const skylineStart: PointF2D = new PointF2D(startX, startY);
-            const skylineEnd: PointF2D = new PointF2D(endX, endY);
-            points = this.calculateTopPoints(skylineStart, skylineEnd, staffLine, skyBottomLineCalculator);
-
-            // For cross-staff slurs, merge the end staff's skyline so obstacles
-            // on other staves (accidentals, stems) are included in clearance.
+        // Collect sky (Above) or bottom (Below) line points
+        if (isAbove) {
+            points = this.calculateTopPoints(new PointF2D(startX, startY), new PointF2D(endX, endY), staffLine, skyBottomLineCalculator);
+            // Track how many points come from the local staff vs merged staves.
+            // Only local points feed the maxY override; merged points still shape angles.
+            localPointCount = points.length;
+            // For cross-staff slurs, merge other staves' skylines into obstacle set
             if (this.slur && this.slur.isCrossed()) {
                 const musicSystem: any = staffLine.ParentMusicSystem;
                 if (musicSystem) {
                     const startRelY: number = staffLine.PositionAndShape.RelativePosition.y;
                     const sampUnit: number = skyBottomLineCalculator.SamplingUnit;
+                    // Only merge from staves of the same instrument (e.g., Piano RH↔LH).
+                    // Skip unrelated staves (e.g., vocal staff above piano).
+                    const myInstrument: any = staffLine.Measures.length > 0 ? (staffLine.Measures[0] as any).parentStaff?.ParentInstrument : undefined;
                     for (const otherSl of musicSystem.StaffLines) {
                         if (otherSl === staffLine) { continue; }
+                        if (myInstrument) {
+                            const otherInst: any = otherSl.Measures.length > 0 ? (otherSl.Measures[0] as any).parentStaff?.ParentInstrument : undefined;
+                            if (otherInst !== myInstrument) { continue; }
+                        }
                         const otherSky: number[] = otherSl.SkyLine;
                         if (!otherSky || otherSky.length === 0) { continue; }
                         const yOffset: number = otherSl.PositionAndShape.RelativePosition.y - startRelY;
@@ -151,270 +132,171 @@ export class GraphicalSlur extends GraphicalCurve {
                             ? otherSl.SkyBottomLineCalculator.SamplingUnit : sampUnit;
                         const sIdx: number = Math.max(0, Math.floor(startX * otherSampUnit));
                         const eIdx: number = Math.min(otherSky.length, Math.ceil(endX * otherSampUnit));
+                        const chordSpan: number = endX - startX;
                         for (let si: number = sIdx; si < eIdx; si++) {
-                            points.push(new PointF2D(si / otherSampUnit, otherSky[si] + yOffset));
+                            // Interpolate yOffset linearly from 0 at startX to full at endX.
+                            // The chord line itself transitions between staves, so points
+                            // near startNote should not be shifted by the full staff gap.
+                            const x: number = si / otherSampUnit;
+                            const t: number = chordSpan > 0 ? (x - startX) / chordSpan : 0;
+                            const interpYOffset: number = yOffset * Math.max(0, Math.min(1, t));
+                            points.push(new PointF2D(x, otherSky[si] + interpYOffset));
                         }
                     }
                 }
             }
-
-            if (points.length === 0) {
-                const pointF: PointF2D = new PointF2D((endX - startX) / 2 + startX,
-                                                      (endY - startY) / 2 + startY);
-                points.push(pointF);
-            }
-
-            // Angle between original x-Axis and Line from Start-Point to End-Point
-            const startEndLineAngleRadians: number = (Math.atan((endY - startY) / (endX - startX)));
-
-            // translate origin at Start (positiveY from Bottom to Top => change sign for Y)
-            const start2: PointF2D = new PointF2D(0, 0);
-            let end2: PointF2D = new PointF2D(endX - startX, -(endY - startY));
-
-            // and Rotate at new Origin startEndLineAngle degrees
-                // clockwise/counterclockwise Rotation
-                // after Rotation end2.Y must be 0
-                // Inverse of RotationMatrix = TransposeMatrix of RotationMatrix
-            const rotationMatrix: Matrix2D = Matrix2D.getRotationMatrix(startEndLineAngleRadians);
-            const transposeMatrix: Matrix2D = rotationMatrix.getTransposeMatrix();
-            end2 = rotationMatrix.vectorMultiplication(end2);
-            const transformedPoints: PointF2D[] = this.calculateTranslatedAndRotatedPointListAbove(points, startX, startY, rotationMatrix);
-
-            // calculate tangent Lines maximum Slopes between StartPoint and EndPoint to all Points in SkyLine
-                // and tangent Lines characteristica
-            const leftLineSlope: number = this.calculateMaxLeftSlope(transformedPoints, start2, end2);
-            const rightLineSlope: number = this.calculateMaxRightSlope(transformedPoints, start2, end2);
-            const leftLineD: number = start2.y - start2.x * leftLineSlope;
-            const rightLineD: number = end2.y - end2.x * rightLineSlope;
-
-            // calculate IntersectionPoint of the 2 Lines
-                // if same Slope, then Point.X between Start and End and Point.Y fixed
-            const intersectionPoint: PointF2D = new PointF2D();
-            let sameSlope: boolean = false;
-            if (Math.abs(Math.abs(leftLineSlope) - Math.abs(rightLineSlope)) < 0.0001) {
-                intersectionPoint.x = end2.x / 2;
-                intersectionPoint.y = 0;
-                sameSlope = true;
-            } else {
-                intersectionPoint.x = (rightLineD - leftLineD) / (leftLineSlope - rightLineSlope);
-                intersectionPoint.y = leftLineSlope * intersectionPoint.x + leftLineD;
-            }
-
-            // calculate tangent Lines Angles
-                // (using the calculated Slopes and the Ratio from the IntersectionPoint's distance to the MaxPoint in the SkyLine)
-            const leftAngle: number = minAngle;
-            const rightAngle: number = -minAngle;
-            // if the calculated Slopes (left and right) are equal, then Angles have fixed values
-            if (!sameSlope) {
-                this.calculateAngles(leftAngle, rightAngle, leftLineSlope, rightLineSlope, maxAngle);
-            }
-            // calculate Curve's Control Points
-            const controlPoints: {leftControlPoint: PointF2D, rightControlPoint: PointF2D} =
-                this.calculateControlPoints(end2.x, leftAngle, rightAngle, transformedPoints);
-
-            let leftControlPoint: PointF2D = controlPoints.leftControlPoint;
-            let rightControlPoint: PointF2D = controlPoints.rightControlPoint;
-
-            // transform ControlPoints to original Coordinate System
-                // (rotate back and translate back)
-            leftControlPoint = transposeMatrix.vectorMultiplication(leftControlPoint);
-            leftControlPoint.x += startX;
-            leftControlPoint.y = -leftControlPoint.y + startY;
-            rightControlPoint = transposeMatrix.vectorMultiplication(rightControlPoint);
-            rightControlPoint.x += startX;
-            rightControlPoint.y = -rightControlPoint.y + startY;
-
-            /* for DEBUG only */
-            // this.intersection = transposeMatrix.vectorMultiplication(intersectionPoint);
-            // this.intersection.x += startX;
-            // this.intersection.y = -this.intersection.y + startY;
-            /* for DEBUG only */
-
-            // Clamp control points: descending chords push left CP behind startX
-            // via sinθ term in inverse rotation (cp_y > 0, sinθ < 0 → x shift < 0).
-            if (leftControlPoint.x < start.x) {
-                leftControlPoint.x = start.x;
-            }
-            if (rightControlPoint.x > end.x) {
-                rightControlPoint.x = end.x;
-            }
-
-            // set private members
-            this.bezierStartPt = start;
-            this.bezierStartControlPt = leftControlPoint;
-            this.bezierEndControlPt = rightControlPoint;
-            this.bezierEndPt = end;
-
-            // calculate CurvePoints
-            const length: number = staffLine.SkyLine.length;
-            const startIndex: number = skyBottomLineCalculator.getLeftIndexForPointX(this.bezierStartPt.x, length);
-            const endIndex: number = skyBottomLineCalculator.getLeftIndexForPointX(this.bezierEndPt.x, length);
-            const distance: number = this.bezierEndPt.x - this.bezierStartPt.x;
-            const samplingUnit: number = skyBottomLineCalculator.SamplingUnit;
-            for (let i: number = startIndex; i < endIndex; i++) {
-                // get the right distance ratio and index on the curve
-                const diff: number = i / samplingUnit - this.bezierStartPt.x;
-                const curvePoint: PointF2D = this.calculateCurvePointAtIndex(Math.abs(diff) / distance);
-
-                // update left- and rightIndex for better accuracy
-                let index: number = skyBottomLineCalculator.getLeftIndexForPointX(curvePoint.x, length);
-                // update SkyLine with final slur curve:
-                if (index >= startIndex) {
-                    staffLine.SkyLine[index] = Math.min(staffLine.SkyLine[index], curvePoint.y);
-                }
-                index++;
-                if (index < length) {
-                    staffLine.SkyLine[index] = Math.min(staffLine.SkyLine[index], curvePoint.y);
-                }
-            }
+            this.debugSkyPoints = points.map((p: PointF2D) => new PointF2D(p.x, p.y));
+            this.debugSkyCategories = points.map((_) => "skyline");
         } else {
-            startY += rules.SlurNoteHeadYOffset;
-            endY += rules.SlurNoteHeadYOffset;
-            start = new PointF2D(startX, startY);
-            end = new PointF2D(endX, endY);
+            points = this.calculateBottomPoints(new PointF2D(startX, startY), new PointF2D(endX, endY), staffLine, skyBottomLineCalculator);
+            localPointCount = points.length;
+        }
 
-            // firstStaffEntry startLowerRightPoint and lastStaffentry endLowerLeftPoint
-            const startLowerRight: PointF2D = new PointF2D(this.staffEntries[0].parentMeasure.PositionAndShape.RelativePosition.x
-                                                           + this.staffEntries[0].PositionAndShape.RelativePosition.x,
-                                                           startY);
-            if (slurStartNote !== undefined) {
-                startLowerRight.x += this.staffEntries[0].PositionAndShape.BorderRight;
-            } else {
-                // continuing Slur from previous StaffLine - must start after last Instruction of first Measure
-                startLowerRight.x = this.staffEntries[0].parentMeasure.beginInstructionsWidth;
-            }
+        if (points.length === 0) {
+            points.push(new PointF2D((endX - startX) / 2 + startX, (endY - startY) / 2 + startY));
+        }
 
-            // must also add the GraceStaffEntry's ParentStaffEntry Position
-            if (this.graceStart) {
-                startLowerRight.x += endStaffEntry.PositionAndShape.RelativePosition.x;
-            }
-            const endLowerLeft: PointF2D = new PointF2D(this.staffEntries[this.staffEntries.length - 1].parentMeasure.PositionAndShape.RelativePosition.x
-                                                        + this.staffEntries[this.staffEntries.length - 1].PositionAndShape.RelativePosition.x,
-                                                        endY);
-            if (slurEndNote !== undefined) {
-                endLowerLeft.x += this.staffEntries[this.staffEntries.length - 1].PositionAndShape.BorderLeft;
-            } else {
-                // Slur continues to next StaffLine - must reach the end of current StaffLine
-                endLowerLeft.x = this.staffEntries[this.staffEntries.length - 1].parentMeasure.PositionAndShape.RelativePosition.x
-                    + this.staffEntries[this.staffEntries.length - 1].parentMeasure.PositionAndShape.Size.width;
-            }
+        // Rotate so chord line becomes horizontal
+        const startEndLineAngleRadians: number = Math.atan((endY - startY) / (endX - startX));
+        const rotationMatrix: Matrix2D = Matrix2D.getRotationMatrix(rotDir * startEndLineAngleRadians);
+        const transposeMatrix: Matrix2D = rotationMatrix.getTransposeMatrix();
 
-            // must also add the GraceStaffEntry's ParentStaffEntry Position
-            if (this.graceEnd) {
-                endLowerLeft.x += endStaffEntry.staffEntryParent.PositionAndShape.RelativePosition.x;
-            }
+        const start2: PointF2D = new PointF2D(0, 0);
+        let end2: PointF2D = new PointF2D(endX - startX, yDir * (endY - startY));
+        end2 = rotationMatrix.vectorMultiplication(end2);
 
-            // BottomLinePointsList between firstStaffEntry startLowerRightPoint and lastStaffentry endLowerLeftPoint
-            const bottomStart: PointF2D = new PointF2D(startX, startY);
-            const bottomEnd: PointF2D = new PointF2D(endX, endY);
-            points = this.calculateBottomPoints(bottomStart, bottomEnd, staffLine, skyBottomLineCalculator);
+        // Transform points: translate then rotate, with Y sign per placement
+        const transformedPoints: PointF2D[] = [];
+        for (const pt of points) {
+            transformedPoints.push(rotationMatrix.vectorMultiplication(new PointF2D(pt.x - startX, yDir * (pt.y - startY))));
+        }
 
-            if (points.length === 0) {
-                const pointF: PointF2D = new PointF2D((endX - startX) / 2 + startX,
-                                                      (endY - startY) / 2 + startY);
-                points.push(pointF);
-            }
-
-            // Angle between original x-Axis and Line from Start-Point to End-Point
-            const startEndLineAngleRadians: number = Math.atan((endY - startY) / (endX - startX));
-            // translate origin at Start
-            const start2: PointF2D = new PointF2D(0, 0);
-            let end2: PointF2D = new PointF2D(endX - startX, endY - startY);
-
-            // and Rotate at new Origin startEndLineAngle degrees
-            // clockwise/counterclockwise Rotation
-            // after Rotation end2.Y must be 0
-            // Inverse of RotationMatrix = TransposeMatrix of RotationMatrix
-            const rotationMatrix: Matrix2D = Matrix2D.getRotationMatrix(-startEndLineAngleRadians);
-            const transposeMatrix: Matrix2D = rotationMatrix.getTransposeMatrix();
-            end2 = rotationMatrix.vectorMultiplication(end2);
-            const transformedPoints: PointF2D[] = this.calculateTranslatedAndRotatedPointListBelow(points, startX, startY, rotationMatrix);
-
-            // calculate tangent Lines maximum Slopes between StartPoint and EndPoint to all Points in BottomLine
-            // and tangent Lines characteristica
-            const leftLineSlope: number = this.calculateMaxLeftSlope(transformedPoints, start2, end2);
-            const rightLineSlope: number = this.calculateMaxRightSlope(transformedPoints, start2, end2);
-            const leftLineD: number = start2.y - start2.x * leftLineSlope;
-            const rightLineD: number = end2.y - end2.x * rightLineSlope;
-
-            // calculate IntersectionPoint of the 2 Lines
-            // if same Slope, then Point.X between Start and End and Point.Y fixed
-            const intersectionPoint: PointF2D = new PointF2D();
-            let sameSlope: boolean = false;
-            if (Math.abs(Math.abs(leftLineSlope) - Math.abs(rightLineSlope)) < 0.0001) {
-                intersectionPoint.x = end2.x / 2;
-                intersectionPoint.y = 0;
-                sameSlope = true;
-            } else {
-                intersectionPoint.x = (rightLineD - leftLineD) / (leftLineSlope - rightLineSlope);
-                intersectionPoint.y = leftLineSlope * intersectionPoint.x + leftLineD;
-            }
-
-            // calculate tangent Lines Angles
-            // (using the calculated Slopes and the Ratio from the IntersectionPoint's distance to the MaxPoint in the SkyLine)
-            const leftAngle: number = minAngle;
-            const rightAngle: number = -minAngle;
-            // if the calculated Slopes (left and right) are equal, then Angles have fixed values
-            if (!sameSlope) {
-                this.calculateAngles(leftAngle, rightAngle, leftLineSlope, rightLineSlope, maxAngle);
-            }
-
-            // calculate Curve's Control Points
-            const controlPoints: {leftControlPoint: PointF2D, rightControlPoint: PointF2D} =
-                this.calculateControlPoints(end2.x, leftAngle, rightAngle, transformedPoints);
-            let leftControlPoint: PointF2D = controlPoints.leftControlPoint;
-            let rightControlPoint: PointF2D = controlPoints.rightControlPoint;
-
-            // transform ControlPoints to original Coordinate System
-            // (rotate back and translate back)
-            leftControlPoint = transposeMatrix.vectorMultiplication(leftControlPoint);
-            leftControlPoint.x += startX;
-            leftControlPoint.y += startY;
-            rightControlPoint = transposeMatrix.vectorMultiplication(rightControlPoint);
-            rightControlPoint.x += startX;
-            rightControlPoint.y += startY;
-
-            /* for DEBUG only */
-            // this.intersection = transposeMatrix.vectorMultiplication(intersectionPoint);
-            // this.intersection.x += startX;
-            // this.intersection.y += startY;
-            /* for DEBUG only */
-
-            // Prevent backward control points (same as Above branch).
-            if (leftControlPoint.x < start.x) {
-                leftControlPoint.x = start.x;
-            }
-            if (rightControlPoint.x > end.x) {
-                rightControlPoint.x = end.x;
-            }
-
-            // set private members
-            this.bezierStartPt = start;
-            this.bezierStartControlPt = leftControlPoint;
-            this.bezierEndControlPt = rightControlPoint;
-            this.bezierEndPt = end;
-
-            // calculate CurvePoints
-            const length: number = staffLine.BottomLine.length;
-            const startIndex: number = skyBottomLineCalculator.getLeftIndexForPointX(this.bezierStartPt.x, length);
-            const endIndex: number = skyBottomLineCalculator.getLeftIndexForPointX(this.bezierEndPt.x, length);
-            const distance: number = this.bezierEndPt.x - this.bezierStartPt.x;
-            const samplingUnit: number = skyBottomLineCalculator.SamplingUnit;
-            for (let i: number = startIndex; i < endIndex; i++) {
-                // get the right distance ratio and index on the curve
-                const diff: number = i / samplingUnit - this.bezierStartPt.x;
-                const curvePoint: PointF2D = this.calculateCurvePointAtIndex(Math.abs(diff) / distance);
-
-                // update left- and rightIndex for better accuracy
-                let index: number = skyBottomLineCalculator.getLeftIndexForPointX(curvePoint.x, length);
-                // update BottomLine with final slur curve:
-                if (index >= startIndex) {
-                    staffLine.BottomLine[index] = Math.max(staffLine.BottomLine[index], curvePoint.y);
+        // Per-point clearance: compute required cp_y so the bezier at each
+        // obstacle's original-space chord fraction (t_orig) exceeds the
+        // obstacle's transformed-space Y. Uses t_orig (projected onto chord
+        // line) instead of transformed t — the rotation shifts X for high-Y
+        // points, making them appear near-end in transformed space.
+        // For cross-staff slurs, applies to merged points only + staff-gap
+        // fallback. For all slurs, replaces the old maxY override which was
+        // mathematically wrong (cp_y=obstacle_Y gives bezier height < obstacle_Y).
+        this.mergedClearanceCpY = -Infinity;
+        if (isAbove) {
+            const chordDx: number = endX - startX;
+            const chordDy: number = endY - startY;
+            const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
+            const minT: number = 0.15;
+            const maxT: number = 0.85;
+            const noteCount: number = this.staffEntries.length;
+            const maxMult: number = noteCount <= 3 ? 1.5 : Math.max(0.6, 1.5 - (noteCount - 3) / 7 * 0.9);
+            const startI: number = this.slur?.isCrossed() ? localPointCount : 0;
+            for (let i: number = startI; i < points.length; i++) {
+                const orig: PointF2D = points[i];
+                const dx: number = orig.x - startX;
+                const dy: number = orig.y - startY;
+                const tOrig: number = (dx * chordDx + dy * chordDy) / chordLenSq;
+                if (tOrig < minT || tOrig > maxT) { continue; }
+                const trans: PointF2D = transformedPoints[i];
+                if (trans.y <= 0) { continue; }
+                const needed: number = Math.min(
+                    trans.y / (3 * tOrig * (1 - tOrig)),
+                    trans.y * maxMult,
+                );
+                if (needed > this.mergedClearanceCpY) {
+                    this.mergedClearanceCpY = needed;
                 }
-                index++;
-                if (index < length) {
-                    staffLine.BottomLine[index] = Math.max(staffLine.BottomLine[index], curvePoint.y);
+            }
+            // Staff-gap fallback for cross-staff slurs: if no merged obstacle
+            // detected above chord, apply a minimum lift based on staff gap.
+            if (this.slur?.isCrossed()) {
+                const staffGap: number = Math.abs(chordDy);
+                const gapMinCpY: number = staffGap * 0.7;
+                if (this.mergedClearanceCpY < gapMinCpY) {
+                    this.mergedClearanceCpY = gapMinCpY;
                 }
+            }
+        }
+
+        // Tangent slopes
+        const leftLineSlope: number = this.calculateMaxLeftSlope(transformedPoints, start2, end2);
+        const rightLineSlope: number = this.calculateMaxRightSlope(transformedPoints, start2, end2);
+        const leftLineD: number = start2.y - start2.x * leftLineSlope;
+        const rightLineD: number = end2.y - end2.x * rightLineSlope;
+
+        // Intersection point
+        const intersectionPoint: PointF2D = new PointF2D();
+        let sameSlope: boolean = false;
+        if (Math.abs(Math.abs(leftLineSlope) - Math.abs(rightLineSlope)) < 0.0001) {
+            intersectionPoint.x = end2.x / 2;
+            intersectionPoint.y = 0;
+            sameSlope = true;
+        } else {
+            intersectionPoint.x = (rightLineD - leftLineD) / (leftLineSlope - rightLineSlope);
+            intersectionPoint.y = leftLineSlope * intersectionPoint.x + leftLineD;
+        }
+
+        // Angles — original code uses minAngle only. calculateAngles was a
+        // no-op (JS passes by value), so slopes never influenced the angle.
+        // Restored no-op; merged points shape the curve via per-point clearance.
+        const leftAngle: number = minAngle;
+        const rightAngle: number = -minAngle;
+        if (!sameSlope) {
+            this.calculateAngles(leftAngle, rightAngle, leftLineSlope, rightLineSlope, maxAngle);
+        }
+
+        // Control points
+        const controlPoints: {leftControlPoint: PointF2D, rightControlPoint: PointF2D} =
+            this.calculateControlPoints(end2.x, leftAngle, rightAngle, transformedPoints, localPointCount);
+
+        // Back-transform to original coordinates
+        let leftControlPoint: PointF2D = controlPoints.leftControlPoint;
+        let rightControlPoint: PointF2D = controlPoints.rightControlPoint;
+        leftControlPoint = transposeMatrix.vectorMultiplication(leftControlPoint);
+        leftControlPoint.x += startX;
+        leftControlPoint.y = yDir * leftControlPoint.y + startY;
+        rightControlPoint = transposeMatrix.vectorMultiplication(rightControlPoint);
+        rightControlPoint.x += startX;
+        rightControlPoint.y = yDir * rightControlPoint.y + startY;
+
+        // Clamp to prevent backward CPs.
+        // When left CP is pushed left of start by the back-rotation, spread it right
+        // proportionally to bow depth to avoid a purely vertical initial tangent.
+        if (leftControlPoint.x < slurStart.x) {
+            const span: number = slurEnd.x - slurStart.x;
+            const bow: number = Math.abs(leftControlPoint.y - slurStart.y);
+            if (bow > span * 0.5) {
+                // Spread left CP right: higher bow → more horizontal spread
+                const excess: number = bow - span * 0.5;
+                leftControlPoint.x = slurStart.x + Math.min(span * 0.4, excess * 0.5);
+            } else {
+                leftControlPoint.x = slurStart.x;
+            }
+        }
+        if (rightControlPoint.x > slurEnd.x) { rightControlPoint.x = slurEnd.x; }
+
+        // Set bezier
+        this.bezierStartPt = slurStart;
+        this.bezierStartControlPt = leftControlPoint;
+        this.bezierEndControlPt = rightControlPoint;
+        this.bezierEndPt = slurEnd;
+
+        // Update sky/bottom line with final curve
+        const line: number[] = isAbove ? staffLine.SkyLine : staffLine.BottomLine;
+        const length: number = line.length;
+        const startIndex: number = skyBottomLineCalculator.getLeftIndexForPointX(this.bezierStartPt.x, length);
+        const endIndex: number = skyBottomLineCalculator.getLeftIndexForPointX(this.bezierEndPt.x, length);
+        const distance: number = this.bezierEndPt.x - this.bezierStartPt.x;
+        const samplingUnit: number = skyBottomLineCalculator.SamplingUnit;
+        const lineOp: (a: number, b: number) => number = isAbove ? Math.min : Math.max;
+        for (let i: number = startIndex; i < endIndex; i++) {
+            const diff: number = i / samplingUnit - this.bezierStartPt.x;
+            const curvePoint: PointF2D = this.calculateCurvePointAtIndex(Math.abs(diff) / distance);
+            let index: number = skyBottomLineCalculator.getLeftIndexForPointX(curvePoint.x, length);
+            if (index >= startIndex) {
+                line[index] = lineOp(line[index], curvePoint.y);
+            }
+            index++;
+            if (index < length) {
+                line[index] = lineOp(line[index], curvePoint.y);
             }
         }
     }
@@ -652,48 +534,19 @@ export class GraphicalSlur extends GraphicalCurve {
     }
 
     /**
-     * This method calculates and returns a list of translated and rotated Points.
-     * @param points
-     * @param startX
-     * @param startY
-     * @param rotationMatrix
-     */
-    private calculateTranslatedAndRotatedPointListAbove(points: PointF2D[], startX: number, startY: number, rotationMatrix: Matrix2D): PointF2D[] {
-        const transformedPoints: PointF2D[] = [];
-        for (const point of points) {
-            const transformedPoint: PointF2D = rotationMatrix.vectorMultiplication(new PointF2D(point.x - startX, -(point.y - startY)));
-            transformedPoints.push(transformedPoint);
-        }
-        return transformedPoints;
-    }
-
-    /**
-     * This method calculates and returns a list of translated and rotated Points.
-     * @param points
-     * @param startX
-     * @param startY
-     * @param rotationMatrix
-     */
-    private calculateTranslatedAndRotatedPointListBelow(points: PointF2D[], startX: number, startY: number, rotationMatrix: Matrix2D): PointF2D[] {
-        const transformedPoints: PointF2D[] = [];
-        for (const point of points) {
-            const transformedPoint: PointF2D = rotationMatrix.vectorMultiplication(new PointF2D(point.x - startX, point.y - startY));
-            transformedPoints.push(transformedPoint);
-        }
-        return transformedPoints;
-    }
-
-    /**
      * This method calculates the two Control Points for the Slur Curve.
      * @param endX
      * @param leftAngle
      * @param rightAngle
      * @param points
+     * @param localPointCount number of leading points from the local staff
+     *   (remaining points come from cross-staff merge); only these feed maxY.
      */
     private calculateControlPoints(endX: number,
                                             leftAngle: number,
                                             rightAngle: number,
-                                            points: PointF2D[]): {leftControlPoint: PointF2D, rightControlPoint: PointF2D} {
+                                            points: PointF2D[],
+                                            localPointCount: number = points.length): {leftControlPoint: PointF2D, rightControlPoint: PointF2D} {
 
         // Some test values:
         // let k: number = 0.4; // (k > 0) -> lower values = flatter curve near endpoints; higher values... "fatter" curve near endpoints
@@ -720,68 +573,11 @@ export class GraphicalSlur extends GraphicalCurve {
             rightCp.y = cp_y;
         }
 
-        // For above slurs, the control point Y values are the highest points of the skyline
-        // plus clearance to ensure the bezier curve clears obstacles (skyline = obstacle top edge).
-        // Only apply when there IS a skyline obstacle above the default curve (maxY > cp_y).
-        // Cap relative to angle-based cp_y to prevent ballooning on long flat chords.
-        // For each skyline point at X ratio r (0..1 of chord), compute the cubic bezier
-        // parameter t where B_x(t) = r*endX, then the Y factor f = 3t(1-t). The bezier
-        // Y at that t is f * (cp_left*(1-t) + cp_right*t). For symmetric CPs this peaks
-        // at t=0.5 with f=0.75; near edges f is smaller so cp_y must be higher.
-        const skylineClearance: number = 1.5; // OSMD units (~15px VF5)
-        let overrideFired: boolean = false;
-        if (this.placement === PlacementEnum.Above) {
-            if (points.length > 0) {
-                const angleCpY: number = leftCp.y;
-                // Compute required cp_y for each skyline point based on its X position.
-                // Cubic bezier X: r = B_x(t) = 3t² - 2t³ for t ∈ [0,1].
-                // Inverse: solve 2t³ - 3t² + r = 0 via triple-angle substitution.
-                // For r ≤ 0.5: t = 0.5 - sin(asin(1-2r)/3)
-                // For r > 0.5: t = 0.5 + sin(asin(2r-1)/3)
-                // Y factor f = 3t(1-t), required cp_y = pt.y / f.
-                let maxRequiredLeft: number = 0;
-                let maxRequiredRight: number = 0;
-                for (const pt of points) {
-                    const r: number = Math.max(0.001, Math.min(0.999, pt.x / endX));
-                    const asinArg: number = r <= 0.5 ? 1 - 2 * r : 2 * r - 1;
-                    const t: number = r <= 0.5
-                        ? 0.5 - Math.sin(Math.asin(asinArg) / 3)
-                        : 0.5 + Math.sin(Math.asin(asinArg) / 3);
-                    const f: number = 3 * t * (1 - t);
-                    const requiredCpY: number = pt.y / Math.max(f, 0.01);
-                    if (pt.x <= endX * 0.5) {
-                        maxRequiredLeft = Math.max(maxRequiredLeft, requiredCpY);
-                    } else {
-                        maxRequiredRight = Math.max(maxRequiredRight, requiredCpY);
-                    }
-                }
-                if (maxRequiredLeft === 0) { maxRequiredLeft = maxRequiredRight; }
-                if (maxRequiredRight === 0) { maxRequiredRight = maxRequiredLeft; }
-                const globalRequired: number = Math.max(maxRequiredLeft, maxRequiredRight);
-                const ratio: number = globalRequired / Math.max(angleCpY, 0.001);
-                const capMultiplier: number =
-                    ratio > 5 ? 2.5 :
-                    ratio > 3 ? 3 :
-                    angleCpY > 3 ? 1.6 : 4;
-                const maxCpY: number = angleCpY * capMultiplier;
-                const effectiveClearance: number = globalRequired > 5 ? 0.3 : skylineClearance;
-                if (maxRequiredLeft > angleCpY) {
-                    overrideFired = true;
-                    leftCp.y = Math.min(maxRequiredLeft + effectiveClearance, maxCpY);
-                }
-                if (maxRequiredRight > rightCp.y) {
-                    rightCp.y = Math.min(maxRequiredRight + effectiveClearance, maxCpY);
-                }
-            }
-            if (!overrideFired) {
-                const minCpY: number = endX * (0.15 / 0.75); // 15% chord at bezier peak
-                if (leftCp.y < minCpY) {
-                    leftCp.y = minCpY;
-                }
-                if (rightCp.y < minCpY) {
-                    rightCp.y = minCpY;
-                }
-            }
+        // Lift CPs above obstacles. mergedClearanceCpY is pre-computed in
+        // calculateCurve per-point with original t (accounts for bezier fraction).
+        if (this.placement === PlacementEnum.Above && this.mergedClearanceCpY > leftCp.y) {
+            leftCp.y = this.mergedClearanceCpY;
+            rightCp.y = this.mergedClearanceCpY;
         }
 
         return {leftControlPoint: leftCp, rightControlPoint: rightCp};
@@ -795,8 +591,10 @@ export class GraphicalSlur extends GraphicalCurve {
      * @param rightLineSlope
      * @param maxAngle
      */
-    private calculateAngles(leftAngle: number, rightAngle: number, leftLineSlope: number, rightLineSlope: number, maxAngle: number): void {
-
+    private calculateAngles(
+        leftAngle: number, rightAngle: number, leftLineSlope: number,
+        rightLineSlope: number, maxAngle: number,
+    ): void {
         // original version with calculated angles:
         const calculatedLeftAngle: number = Math.atan(leftLineSlope) * 180 / Math.PI * 0.75;
         const calculatedRightAngle: number = Math.atan(rightLineSlope) * 180 / Math.PI * 0.75;
