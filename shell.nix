@@ -4,6 +4,7 @@ pkgs.mkShell {
   buildInputs = with pkgs; [
     nodejs
     xvfb-run
+    cups
   ];
 
   shellHook = ''

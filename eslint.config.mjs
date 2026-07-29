@@ -48,7 +48,7 @@ export default defineConfig(
             },
             parserOptions: {
                 projectService: {
-                    allowDefaultProject: ["vitest.config.ts", "vitest.browser.config.ts"],
+                    allowDefaultProject: ["vitest.config.ts", "vitest.browser.config.ts", "vitest.browser.debug.config.ts"],
                 },
                 tsconfigRootDir: import.meta.dirname, // needs node v20+, but eslint >=9 needs it anyways
             },
