@@ -995,6 +995,24 @@ export abstract class MusicSheetCalculator {
         // calculate Sky- and BottomLine
         // will have reasonable values only between ObjectsBorders (eg StaffEntries)
         this.calculateSkyBottomLines();
+
+        // Finalize staff Y positions BEFORE slurs: slurs must avoid obstacles at the
+        // rendered staff positions. Previously the Y layout ran after calculateSlurs,
+        // so slurs used only the minimum RelativePosition gap, which differs from the
+        // final (content-aware) staff spacing. The slurs themselves are thin curves and
+        // don't need to inflate the inter-staff spacing.
+        // update all StaffLine's Borders
+        // create temporary Object, just to call the methods (in order to avoid declaring them static)
+        for (let idx2: number = 0, len2: number = this.musicSystems.length; idx2 < len2; ++idx2) {
+            const musicSystem: MusicSystem = this.musicSystems[idx2];
+            for (let idx3: number = 0, len3: number = musicSystem.StaffLines.length; idx3 < len3; ++idx3) {
+                const staffLine: StaffLine = musicSystem.StaffLines[idx3];
+                this.updateStaffLineBorders(staffLine);
+            }
+        }
+        // calculate Y-spacing -> MusicPages are created here
+        musicSystemBuilder.calculateSystemYLayout();
+
         // calculate TupletsNumbers
         this.calculateTupletNumbers();
 
@@ -1064,18 +1082,6 @@ export abstract class MusicSheetCalculator {
         // calculate all LyricWords Positions
         this.calculateLyricsPosition();
 
-        // update all StaffLine's Borders
-        // create temporary Object, just to call the methods (in order to avoid declaring them static)
-        for (let idx2: number = 0, len2: number = this.musicSystems.length; idx2 < len2; ++idx2) {
-            const musicSystem: MusicSystem = this.musicSystems[idx2];
-            for (let idx3: number = 0, len3: number = musicSystem.StaffLines.length; idx3 < len3; ++idx3) {
-                const staffLine: StaffLine = musicSystem.StaffLines[idx3];
-                this.updateStaffLineBorders(staffLine);
-            }
-        }
-
-        // calculate Y-spacing -> MusicPages are created here
-        musicSystemBuilder.calculateSystemYLayout();
         // calculate Comments for each Staffline
         this.calculateComments();
         // calculate marked Areas for Systems

@@ -45,6 +45,7 @@ interface SlurInfo {
     staffTopSvg: number;
     staffBottomSvg: number;
     leakPx: number; // positive = slur extends beyond staff boundary
+    leakOverlap: boolean; // true = bezier overlaps elements in adjacent system
     obstacleSvgPoints: Array<{ x: number; y: number; cat: string }>;
 }
 
@@ -52,14 +53,13 @@ interface ScoreConfig {
     name: string;
     path: string;
     maxCpY: number;
-    leakThreshold: number; // px above staff union boundary
 }
 
 const SCORES: ScoreConfig[] = [
-    { name: "John Field", path: ".john-field-piano-concerto-7_m318-323.mxl", maxCpY: 6.0, leakThreshold: 50 },
-    { name: "Dichterliebe", path: "Dichterliebe01.xml", maxCpY: 8.0, leakThreshold: 80 },
-    { name: "Beethoven", path: "Beethoven_AnDieFerneGeliebte.xml", maxCpY: 6.0, leakThreshold: 40 },
-    { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0, leakThreshold: 50 },
+    { name: "John Field", path: ".john-field-piano-concerto-7_m318-323.mxl", maxCpY: 6.0 },
+    { name: "Dichterliebe", path: "Dichterliebe01.xml", maxCpY: 8.0 },
+    { name: "Beethoven", path: "Beethoven_AnDieFerneGeliebte.xml", maxCpY: 6.0 },
+    { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0 },
 ];
 
 // ── Score loading ────────────────────────────────────────────────────────────
@@ -335,6 +335,7 @@ function collectCrossStaffSlurs(gms: GraphicalMusicSheet, rules: EngravingRules)
                         staffTopSvg: stTopSvg,
                         staffBottomSvg: stBotSvg,
                         leakPx,
+                        leakOverlap: false, // filled after SVG annotation
                     });
                 }
             }
@@ -368,10 +369,225 @@ function dumpSvgStructure(svg: SVGSVGElement): void {
 
 // ── Problem SVG annotation ───────────────────────────────────────────────────
 
+function getPathBBox(el: Element): { x: number; y: number; w: number; h: number } | null {
+    const d: string = el.getAttribute("d") ?? "";
+    const nums: number[] = d.match(/[\d.]+/g)?.map(Number) ?? [];
+    if (nums.length < 4) { return null; }
+    let mnX: number = Infinity, mnY: number = Infinity, mxX: number = -Infinity, mxY: number = -Infinity;
+    for (let i: number = 0; i + 1 < nums.length; i += 2) {
+        if (nums[i] < mnX) { mnX = nums[i]; }
+        if (nums[i] > mxX) { mxX = nums[i]; }
+        if (nums[i + 1] < mnY) { mnY = nums[i + 1]; }
+        if (nums[i + 1] > mxY) { mxY = nums[i + 1]; }
+    }
+    if (mxX <= mnX || mxY <= mnY) { return null; }
+    return { x: mnX, y: mnY, w: mxX - mnX, h: mxY - mnY };
+}
+
+/// Check if a bezier curve overlaps any non-slur path elements in an SVG group.
+/// Samples the curve at 20 points and checks point-in-bbox for each.
+/// For all slurs, check if the bezier curve's extreme Y (min for above-placement,
+/// max for below-placement) reaches into the adjacent staff system's Y range.
+/// Sets `s.leakOverlap` on each slur.
+function computeAdjacentOverlaps(svg: SVGSVGElement, slurs: SlurInfo[]): void {
+    // Build staffline index sorted by Y
+    const slLines: { bbox: { x: number; y: number; w: number; h: number } }[] = [];
+    for (const slEl of svg.querySelectorAll('.staffline')) {
+        const bb: { x: number; y: number; w: number; h: number } | null = getPathBBox(slEl);
+        if (bb) { slLines.push({ bbox: bb }); }
+    }
+    slLines.sort((a, b) => a.bbox.y - b.bbox.y);
+
+    for (const s of slurs) {
+        s.leakOverlap = false;
+        if (!s.startCp) { continue; }
+        const above: boolean = s.svgStartCp.y < s.svgStart.y;
+        // Find which staffline the slur lives in (by mid Y)
+        const slurMidY: number = (s.svgStart.y + s.svgEnd.y) / 2;
+        const slIdx: number = slLines.findIndex(slb =>
+            slurMidY >= slb.bbox.y && slurMidY <= slb.bbox.y + slb.bbox.h);
+        if (slIdx < 0) { continue; }
+        const adjIdx: number = above ? slIdx - 1 : slIdx + 1;
+        if (adjIdx < 0 || adjIdx >= slLines.length) { continue; }
+        const adjBBox: { x: number; y: number; w: number; h: number } = slLines[adjIdx].bbox;
+
+        // Compute bezier extreme Y by sampling
+        const sx: number = s.svgStart.x, sy: number = s.svgStart.y;
+        const c1x: number = s.svgStartCp.x, c1y: number = s.svgStartCp.y;
+        const c2x: number = s.svgEndCp.x, c2y: number = s.svgEndCp.y;
+        const ex: number = s.svgEnd.x, ey: number = s.svgEnd.y;
+        let minY: number = Math.min(sy, ey, c1y, c2y);
+        let maxY: number = Math.max(sy, ey, c1y, c2y);
+        for (let i: number = 1; i < 15; i++) {
+            const t: number = i / 15;
+            const t1: number = 1 - t;
+            const by: number = t1 * t1 * t1 * sy + 3 * t1 * t1 * t * c1y + 3 * t1 * t * t * c2y + t * t * t * ey;
+            if (by < minY) { minY = by; }
+            if (by > maxY) { maxY = by; }
+        }
+
+        if (above) {
+            // Above-placement: check if bezier's top (minY) reaches into system above's Y range
+            const adjTop: number = adjBBox.y;
+            const adjBot: number = adjBBox.y + adjBBox.h;
+            if (minY >= adjTop && minY <= adjBot) { s.leakOverlap = true; }
+        } else {
+            // Below-placement: check if bezier's bottom (maxY) reaches into system below's Y range
+            const adjTop: number = adjBBox.y;
+            const adjBot: number = adjBBox.y + adjBBox.h;
+            if (maxY >= adjTop && maxY <= adjBot) { s.leakOverlap = true; }
+        }
+    }
+}
+
+/**
+ * Check if a cubic bezier overlaps any obstacle points.
+ * Samples bezier at 100 t-values, finds nearest X to each obstacle,
+ * then checks if bezier Y at that t exceeds obstacle Y (above-placement)
+ * or falls below obstacle Y (below-placement).
+ */
+function bezierCollidesWithObstacles(
+    sx: number, sy: number,
+    c1x: number, c1y: number,
+    c2x: number, c2y: number,
+    ex: number, ey: number,
+    above: boolean,
+    obstacles: Array<{ x: number; y: number }>,
+): boolean {
+    if (obstacles.length === 0) { return false; }
+    const N: number = 100;
+    const sampleX: number[] = new Array(N + 1);
+    const sampleY: number[] = new Array(N + 1);
+    for (let i: number = 0; i <= N; i++) {
+        const t: number = i / N;
+        const t1: number = 1 - t;
+        const t1sq: number = t1 * t1;
+        const tsq: number = t * t;
+        sampleX[i] = t1sq * t1 * sx + 3 * t1sq * t * c1x + 3 * t1 * tsq * c2x + tsq * t * ex;
+        sampleY[i] = t1sq * t1 * sy + 3 * t1sq * t * c1y + 3 * t1 * tsq * c2y + tsq * t * ey;
+    }
+    for (const obs of obstacles) {
+        // Skip obstacles outside the clearable t range — the clearance computation
+        // ignores edge-near obstacles (a bezier can't bow much near its endpoints),
+        // so flagging them here is a false positive.
+        const chordDx: number = ex - sx;
+        const chordDy: number = ey - sy;
+        const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
+        const tObs: number = ((obs.x - sx) * chordDx + (obs.y - sy) * chordDy) / chordLenSq;
+        if (tObs < 0.15 || tObs > 0.85) { continue; }
+        let bestIdx: number = -1;
+        let bestDist: number = Infinity;
+        for (let i: number = 0; i <= N; i++) {
+            const d: number = Math.abs(sampleX[i] - obs.x);
+            if (d < bestDist) { bestDist = d; bestIdx = i; }
+        }
+        if (bestIdx < 0) { continue; }
+        const by: number = sampleY[bestIdx];
+        // 5px tolerance — bezier clearing within half a staff space is acceptable
+        const TOLERANCE: number = 5;
+        if (above && by > obs.y + TOLERANCE) { return true; }
+        if (!above && by < obs.y - TOLERANCE) { return true; }
+    }
+    return false;
+}
+
+/** Add SVG-verified notehead positions as obstacle points.
+ *  Queries <text> x/y attributes directly (getBBox() returns 0 in JSDOM).
+ *  Replaces OSMD-converted injected/stem points (wrong Y for sibling staff)
+ *  with pixel-perfect SVG positions. */
+function addSvgObstacles(svg: SVGSVGElement, slurs: SlurInfo[]): void {
+    // Build stave Y ranges from SVG: each stave has 5 staff lines
+    const staveRanges: Array<{ top: number; bot: number }> = [];
+    for (const stave of svg.querySelectorAll("g.vf-stave")) {
+        const lines: number[] = [];
+        for (const p of stave.querySelectorAll("path[d]")) {
+            const d: string = p.getAttribute("d") ?? "";
+            const coords: string[] = d.match(/[\d.]+/g) ?? [];
+            for (let ci: number = 0; ci + 1 < coords.length; ci += 2) {
+                lines.push(parseFloat(coords[ci + 1]));
+            }
+        }
+        if (lines.length > 0) {
+            const top: number = Math.min(...lines);
+            const bot: number = Math.max(...lines);
+            staveRanges.push({ top, bot });
+        }
+    }
+
+    const nhMap: Map<string, { x: number; y: number }[]> = new Map();
+    for (const nh of svg.querySelectorAll("g.vf-notehead")) {
+        const noteEl: Element | null = nh.closest("[data-note-id]");
+        const xmlId: string = noteEl?.getAttribute("data-note-id") ?? "";
+        if (!xmlId) { continue; }
+        const textEl: Element | null = nh.querySelector("text");
+        if (!textEl) { continue; }
+        const tx: string | null = textEl.getAttribute("x");
+        const ty: string | null = textEl.getAttribute("y");
+        if (!tx || !ty) { continue; }
+        let cx: number = parseFloat(tx);
+        const rectEl: Element | null = nh.parentElement?.querySelector("rect");
+        if (rectEl) {
+            const rw: string | null = rectEl.getAttribute("width");
+            if (rw) { cx += parseFloat(rw) / 2; }
+        } else { cx += 6; }
+        const arr: { x: number; y: number }[] = nhMap.get(xmlId) || [];
+        arr.push({ x: cx, y: parseFloat(ty) });
+        nhMap.set(xmlId, arr);
+    }
+    for (const s of slurs) {
+        s.obstacleSvgPoints = s.obstacleSvgPoints.filter(op => op.cat === "skyline");
+        const minSvgX: number = Math.min(s.svgStart.x, s.svgEnd.x);
+        const maxSvgX: number = Math.max(s.svgStart.x, s.svgEnd.x);
+        const aboveSlur: boolean = s.svgStartCp.y < s.svgStart.y;
+        const chordMidY: number = (s.svgStart.y + s.svgEnd.y) / 2;
+        // For non-cross slurs: find which stave the chord belongs to via start Y,
+        // then only include noteheads from that stave (exclude sibling staff).
+        // For cross-staff slurs: include all noteheads.
+        let yMin: number = -Infinity;
+        let yMax: number = Infinity;
+        if (!s.isCrossed) {
+            // VF5: g.vf-stavenote is a SIBLING of g.vf-stave (both under g.vf-measure),
+            // so closest("g.vf-stave") fails. Instead match the start note's own
+            // SVG Y against the nearest stave range.
+            const startTextEl: Element | null = svg.querySelector(`[data-note-id="${s.id}"] text`);
+            const startYAttr: string | null = startTextEl?.getAttribute("y") ?? null;
+            const startNoteY: number = startYAttr ? parseFloat(startYAttr) : chordMidY;
+            const ledgerTolerance: number = 120;
+            let bestTop: number = -Infinity;
+            let bestBot: number = Infinity;
+            let bestDist: number = Infinity;
+            for (const sr of staveRanges) {
+                const near: number = startNoteY < sr.top ? sr.top : (startNoteY > sr.bot ? sr.bot : startNoteY);
+                const dist: number = Math.abs(startNoteY - near);
+                if (dist < bestDist) { bestDist = dist; bestTop = sr.top; bestBot = sr.bot; }
+            }
+            if (bestDist < Infinity) {
+                yMin = bestTop - ledgerTolerance;
+                yMax = bestBot + ledgerTolerance;
+            }
+        }
+        for (const [xmlId, positions] of nhMap) {
+            if (xmlId === s.id) { continue; }
+            for (const pos of positions) {
+                if (pos.x < minSvgX || pos.x > maxSvgX) { continue; }
+                if ((aboveSlur && pos.y >= chordMidY) || (!aboveSlur && pos.y <= chordMidY)) { continue; }
+                if (pos.y < yMin || pos.y > yMax) { continue; }
+                s.obstacleSvgPoints.push({ x: pos.x, y: pos.y, cat: "injected" });
+            }
+        }
+    }
+}
+
+/** Derive output stem from score filename (strip ext, leading dots, normalize). */
+function stemFromPath(path: string): string {
+    let s: string = path.replace(/\.(mxl|xml)$/, "").replace(/^\.+/, "");
+    return s.replace(/[^a-zA-Z0-9]+/g, "_").replace(/_+$/, "");
+}
+
 function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConfig): void {
     const isNode: boolean = typeof process !== "undefined" && typeof require !== "undefined";
-    const envTag: string = isNode ? "_jsdom" : "_browser";
-    const outName: string = `${cfg.name.replace(/\s+/g, "_")}${envTag}.svg`;
+    const envTag: string = isNode ? "jsdom" : "browser";
+    const stem: string = stemFromPath(cfg.path);
 
     const clone: SVGSVGElement = svg.cloneNode(true) as SVGSVGElement;
     const ns: string = "http://www.w3.org/2000/svg";
@@ -403,17 +619,9 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
     }
 
     let fontCss: string = "";
-    if (isNode) {
-        const p2: any = require("path");
-        const f2: any = require("fs");
-        const fd: string = p2.resolve(__dirname, "../../../../external/vexflow/node_modules/@vexflow-fonts");
-        for (const [family, file] of [["Bravura","bravura/bravura.woff2"], ["Gonville","gonville/gonville.woff2"]]) {
-            const fp: string = p2.join(fd, file);
-            if (f2.existsSync(fp)) {
-                const b64: string = f2.readFileSync(fp).toString("base64");
-                fontCss += `@font-face{font-family:'${family}';src:url(data:font/woff2;base64,${b64})}`;
-            }
-        }
+    const fontData: Record<string, string> = (globalThis as any).__fontData__ ?? {};
+    for (const [family, b64] of Object.entries(fontData)) {
+        fontCss += `@font-face{font-family:'${family}';src:url(data:font/woff2;base64,${b64})}`;
     }
     const styleEl: SVGStyleElement = document.createElementNS(ns, "style") as SVGStyleElement;
     styleEl.textContent = fontCss + `.problem-slur{fill:rgba(255,40,40,0.35)!important}
@@ -423,29 +631,50 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
 .problem-bg{fill:rgba(255,255,255,0.5);stroke:#c00;stroke-width:1;rx:2}`;
     clone.insertBefore(styleEl, clone.firstChild);
 
+    // Pre-compute adjacent-system overlaps for leak detection
+    computeAdjacentOverlaps(clone, slurs);
+
+    // Query notehead SVG positions directly from DOM — bypasses OSMD unit
+    // conversion which gives wrong Y for sibling-staff obstacle points.
+    // Replace OSMD-converted injected/stem points with SVG-verified positions
+    addSvgObstacles(clone, slurs);
+
+
     for (const s of slurs) {
-        const hw: number = s.cpY_osmd / Math.max(0.01, Math.abs(s.spanX));
-        const isBalloon: boolean = !s.isCrossed && (s.cpY_osmd > cfg.maxCpY || hw > 0.85);
-        const isLeak: boolean = s.leakPx > cfg.leakThreshold;
-        let isCollision: boolean = false;
-        if (!s.isCrossed && s.startCp && s.obstacleSvgPoints.length > 0) {
-            const sx: number = s.svgStart.x, ex: number = s.svgEnd.x;
-            const spanX: number = ex - sx;
-            if (spanX > 1) {
+        // Detect real collision: does the bezier curve actually intersect any obstacle point?
+        const aboveSlur: boolean = s.svgStartCp.y < s.svgStart.y;
+        const hasCollision: boolean = s.obstacleSvgPoints.length > 0 && s.startCp
+            ? bezierCollidesWithObstacles(
+                s.svgStart.x, s.svgStart.y,
+                s.svgStartCp.x, s.svgStartCp.y,
+                s.svgEndCp.x, s.svgEndCp.y,
+                s.svgEnd.x, s.svgEnd.y,
+                aboveSlur,
+                s.obstacleSvgPoints
+              )
+            : false;
+        const isLeak: boolean = s.leakOverlap;
+        const isProblem: boolean = hasCollision || isLeak;
+
+        // Draw obstacle points as circles for ALL slurs (not just problem ones)
+        if (s.obstacleSvgPoints.length > 0 && s.startCp) {
+            const sg: Element | null = clone.querySelector(`[id="vf-${s.id}-slur"]`);
+            if (sg && sg.parentNode) {
                 for (const op of s.obstacleSvgPoints) {
-                    const t: number = (op.x - sx) / spanX;
-                    if (t < 0.05 || t > 0.95) { continue; }
-                    const t1: number = 1 - t;
-                    const bY: number = t1*t1*t1 * s.svgStart.y
-                        + 3*t1*t1*t * s.svgStartCp!.y
-                        + 3*t1*t*t * s.svgEndCp!.y
-                        + t*t*t * s.svgEnd.y;
-                    if (bY >= op.y - 10) { isCollision = true; break; }
+                    const isSky: boolean = op.cat === "skyline";
+                    const circ: SVGCircleElement = document.createElementNS(ns, "circle") as SVGCircleElement;
+                    circ.setAttribute("cx", String(op.x));
+                    circ.setAttribute("cy", String(op.y));
+                    circ.setAttribute("r", isSky ? "2.5" : "3.5");
+                    circ.setAttribute("fill", isSky ? "rgba(0,180,0,0.6)" : "rgba(255,165,0,0.8)");
+                    circ.setAttribute("stroke", isSky ? "#060" : "#f80");
+                    circ.setAttribute("stroke-width", "1");
+                    sg.appendChild(circ);
                 }
             }
         }
-        const isProblem: boolean = isBalloon || isLeak || isCollision;
 
+        // Problem annotations (balloon/leak) only for problematic slurs
         if (!isProblem || !s.startCp) { continue; }
 
         // Find the slur SVG group by ID
@@ -476,8 +705,8 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
             for (let i: number = 0; i + 1 < nums.length; i += 2) {
                 if (nums[i] < mnX) { mnX = nums[i]; }
                 if (nums[i] > mxX) { mxX = nums[i]; }
-                if (nums[i+1] < mnY) { mnY = nums[i+1]; }
-                if (nums[i+1] > mxY) { mxY = nums[i+1]; }
+                if (nums[i + 1] < mnY) { mnY = nums[i + 1]; }
+                if (nums[i + 1] > mxY) { mxY = nums[i + 1]; }
             }
             if (mxX <= mnX || mxY <= mnY) { return; }
             const rect: SVGRectElement = document.createElementNS(ns, "rect") as SVGRectElement;
@@ -492,9 +721,8 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
 
         // Labels at bottom-right, stacked
         const lbls: string[] = [];
-        if (isBalloon) { lbls.push(`hw=${hw.toFixed(2)}`); }
-        if (isLeak) { lbls.push(`leak=${s.leakPx.toFixed(0)}px`); }
-        if (isCollision) { lbls.push("collision"); }
+        if (hasCollision) { lbls.push(`collide obs=${s.obstacleCount}`); }
+        if (isLeak) { lbls.push("leak"); }
         if (!s.startCp) { continue; }
         let lx: number = s.svgStart.x;
         let ly: number = Math.max(s.svgStartCp.y, s.svgEndCp.y) + 18;
@@ -520,19 +748,6 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
             lb.textContent = txt;
             slurGroup.parentNode?.insertBefore(lb, slurGroup);
         }
-
-        // Draw obstacle points as tiny circles
-        for (const op of s.obstacleSvgPoints) {
-            const circ: SVGCircleElement = document.createElementNS(ns, "circle") as SVGCircleElement;
-            const isSky: boolean = op.cat === "skyline";
-            circ.setAttribute("r", isSky ? "2.5" : "3.5");
-            circ.setAttribute("cx", String(op.x));
-            circ.setAttribute("cy", String(op.y));
-            circ.setAttribute("fill", isSky ? "rgba(0,180,0,0.6)" : "rgba(255,165,0,0.8)");
-            circ.setAttribute("stroke", isSky ? "#060" : "#f80");
-            circ.setAttribute("stroke-width", "1");
-            slurGroup.parentNode?.insertBefore(circ, slurGroup);
-        }
     }
 
     const svgStr: string = new XMLSerializer().serializeToString(clone);
@@ -543,22 +758,21 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
             || path2.resolve(__dirname, "../../../../visual_regression/debug-svgs");
         if (!fs2.existsSync(baseDir)) { fs2.mkdirSync(baseDir, { recursive: true }); }
         const html: string = `<!DOCTYPE html><html><meta charset="utf-8"><body style="margin:0">${svgStr}</body></html>`;
-        const stem: string = cfg.name.replace(/\s+/g, "_");
-        fs2.writeFileSync(path2.join(baseDir, `${stem}${envTag}.html`), html);
-        console.warn(`  ${stem}${envTag}.html`);
+        fs2.writeFileSync(path2.join(baseDir, `${stem}_${envTag}.html`), html);
+        console.warn(`  ${stem}_${envTag}.html`);
     } else {
         (async () => {
             const html: string = `<!DOCTYPE html><html><meta charset="utf-8"><body style="margin:0">${svgStr}</body></html>`;
             try {
                 const { server: srv }: any = await import("@vitest/browser/context");
                 if (srv?.commands?.writeFile) {
-                    const outRel: string = `visual_regression/debug-svgs/${cfg.name.replace(/\s+/g, "_")}_${envTag}.html`;
+                    const outRel: string = `visual_regression/debug-svgs/${stem}_${envTag}.html`;
                     await srv.commands.writeFile(outRel, html);
                     console.warn(`  ${outRel} (via vitest browser)`);
                     return;
                 }
             } catch (_e) { /* fallback to data URL */ }
-            console.warn(`  ${cfg.name.replace(/\s+/g, "_")}_${envTag}.html data URL logged`);
+            console.warn(`  ${stem}_${envTag}.html data URL logged`);
         })();
     }
 }
@@ -576,7 +790,14 @@ describe("Debug slur obstacles", () => {
             beforeAll(async () => {
                 const { calc, gms } = await loadScore(cfg.path);
                 prepareMeasures(gms);
+
+                // Render first — this calls calculateCurve which populates debugSkyPoints
+                svg = renderToSvg(gms, calc.rules);
+
+                // Collect slur data AFTER rendering so debugSkyPoints is populated
                 slurs = collectCrossStaffSlurs(gms, calc.rules);
+                // Add SVG-verified notehead positions as obstacle points (replaces OSMD-converted with wrong Y for sibling staves)
+                addSvgObstacles(svg, slurs);
 
                 // Build VF5 auto-ID → xmlId map for slur SVG lookup
                 const vfIdToXmlId: Map<string, string> = new Map();
@@ -586,7 +807,6 @@ describe("Debug slur obstacles", () => {
                     }
                 }
 
-                svg = renderToSvg(gms, calc.rules);
                 noteheadBBoxes = queryNoteheadBBoxes(svg);
                 slurBBoxes = querySlurBBoxes(svg, vfIdToXmlId);
             });
@@ -604,23 +824,33 @@ describe("Debug slur obstacles", () => {
                     `${cfg.name}: expected ≥1 slur, got ${slurs.length}`);
             });
 
-            it("no excessive ballooning — cpY within limit", () => {
+            it("no bezier-obstacle collision — real overlap check", () => {
+                // Compute adjacent overlaps for leak detection
+                if (svg && slurs.length > 0) {
+                    computeAdjacentOverlaps(svg, slurs);
+                }
                 const failures: string[] = [];
                 for (const s of slurs) {
-                    const hw: number = s.cpY_osmd / Math.max(0.01, Math.abs(s.spanX));
-                    if (s.isCrossed) {
-                        // Cross-staff slurs have inherent staff gap; use height-width ratio
-                        if (hw > 3.0) {
-                            failures.push(`${s.id} cpY=${s.cpY_osmd.toFixed(2)} spanX=${s.spanX.toFixed(2)} hw=${hw.toFixed(3)} obs=${s.obstacleCount} > maxHw=3.0`);
-                        }
-                    } else {
-                        // Non-cross slurs: fail if cpY exceeds limit OR taller than wide
-                        if (s.cpY_osmd > cfg.maxCpY || hw > 0.85) {
-                            failures.push(`${s.id} cpY=${s.cpY_osmd.toFixed(2)} spanX=${s.spanX.toFixed(2)} hw=${hw.toFixed(3)} obs=${s.obstacleCount} maxCpY=${cfg.maxCpY}`);
-                        }
+                    if (!s.startCp) { continue; }
+                    const aboveSlur: boolean = s.svgStartCp.y < s.svgStart.y;
+                    const hasCollision: boolean = s.obstacleSvgPoints.length > 0
+                        ? bezierCollidesWithObstacles(
+                            s.svgStart.x, s.svgStart.y,
+                            s.svgStartCp.x, s.svgStartCp.y,
+                            s.svgEndCp.x, s.svgEndCp.y,
+                            s.svgEnd.x, s.svgEnd.y,
+                            aboveSlur,
+                            s.obstacleSvgPoints
+                          )
+                        : false;
+                    if (hasCollision) {
+                        failures.push(`${s.id} bezier intersects ${s.obstacleCount} obstacles`);
+                    }
+                    if (s.leakOverlap) {
+                        failures.push(`${s.id} leaks into adjacent system`);
                     }
                 }
-                expect(failures, `${failures.length} slurs exceed limits`)
+                expect(failures, `${failures.length} slurs with bezier-obstacle collision`)
                     .to.deep.equal([]);
             });
 
@@ -646,11 +876,15 @@ describe("Debug slur obstacles", () => {
                     .to.deep.equal([]);
             });
 
-            it("no leaking into adjacent staff systems", () => {
+            it("no leaking into adjacent staff systems — bezier overlaps elements", () => {
                 const failures: string[] = [];
+                if (!svg || !slurs.length) { expect(failures).to.deep.equal([]); return; }
+                // Compute adjacent overlaps for all slurs
+                computeAdjacentOverlaps(svg, slurs);
                 for (const s of slurs) {
-                    if (s.leakPx <= cfg.leakThreshold) { continue; }
-                    failures.push(`${s.id} leak=${s.leakPx.toFixed(1)}px > ${cfg.leakThreshold}px`);
+                    if (s.leakOverlap) {
+                        failures.push(`${s.id} bezier overlaps adjacent system`);
+                    }
                 }
                 expect(failures, `${failures.length} slurs leak into adjacent staff`)
                     .to.deep.equal([]);

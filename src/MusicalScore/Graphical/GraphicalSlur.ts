@@ -105,20 +105,23 @@ export class GraphicalSlur extends GraphicalCurve {
         const slurEnd: PointF2D = new PointF2D(endX, endY);
 
         // Collect sky (Above) or bottom (Below) line points
+        const myInstrument: any = staffLine.Measures.length > 0 ? (staffLine.Measures[0] as any).parentStaff?.ParentInstrument : undefined;
         if (isAbove) {
             points = this.calculateTopPoints(new PointF2D(startX, startY), new PointF2D(endX, endY), staffLine, skyBottomLineCalculator);
             // Track how many points come from the local staff vs merged staves.
             // Only local points feed the maxY override; merged points still shape angles.
             localPointCount = points.length;
-            // For cross-staff slurs, merge other staves' skylines into obstacle set
-            if (this.slur && this.slur.isCrossed()) {
+            // For cross-staff slurs only, merge other staves' skylines into obstacle set.
+            // Merge skyline from sibling staves so bezier clears adjacent staff.
+            // Non-cross slurs must NOT get sibling staff obstacles — they're in a
+            // different Y space and would falsely inflate clearance.
+            if (this.slur?.isCrossed() && staffLine.ParentMusicSystem) {
                 const musicSystem: any = staffLine.ParentMusicSystem;
                 if (musicSystem) {
                     const startRelY: number = staffLine.PositionAndShape.RelativePosition.y;
                     const sampUnit: number = skyBottomLineCalculator.SamplingUnit;
                     // Only merge from staves of the same instrument (e.g., Piano RH↔LH).
                     // Skip unrelated staves (e.g., vocal staff above piano).
-                    const myInstrument: any = staffLine.Measures.length > 0 ? (staffLine.Measures[0] as any).parentStaff?.ParentInstrument : undefined;
                     for (const otherSl of musicSystem.StaffLines) {
                         if (otherSl === staffLine) { continue; }
                         if (myInstrument) {
@@ -127,20 +130,19 @@ export class GraphicalSlur extends GraphicalCurve {
                         }
                         const otherSky: number[] = otherSl.SkyLine;
                         if (!otherSky || otherSky.length === 0) { continue; }
+                        // Staff Y layout is finalized BEFORE calculateSlurs (see
+                        // MusicSheetCalculator), so RelativePosition.y is the final
+                        // content-aware staff gap — matches the rendered layout.
                         const yOffset: number = otherSl.PositionAndShape.RelativePosition.y - startRelY;
                         const otherSampUnit: number = otherSl.SkyBottomLineCalculator
                             ? otherSl.SkyBottomLineCalculator.SamplingUnit : sampUnit;
                         const sIdx: number = Math.max(0, Math.floor(startX * otherSampUnit));
                         const eIdx: number = Math.min(otherSky.length, Math.ceil(endX * otherSampUnit));
-                        const chordSpan: number = endX - startX;
                         for (let si: number = sIdx; si < eIdx; si++) {
-                            // Interpolate yOffset linearly from 0 at startX to full at endX.
-                            // The chord line itself transitions between staves, so points
-                            // near startNote should not be shifted by the full staff gap.
                             const x: number = si / otherSampUnit;
-                            const t: number = chordSpan > 0 ? (x - startX) / chordSpan : 0;
-                            const interpYOffset: number = yOffset * Math.max(0, Math.min(1, t));
-                            points.push(new PointF2D(x, otherSky[si] + interpYOffset));
+                            // Use full yOffset for ALL points — sibling staff skyline is in
+                            // that staff's coordinate system, so shift by the full staff gap.
+                            points.push(new PointF2D(x, otherSky[si] + yOffset));
                         }
                     }
                 }
@@ -152,40 +154,67 @@ export class GraphicalSlur extends GraphicalCurve {
             // overlapping the slur's X range (not just same-voice staffEntries).
             // Pixel-based skyline misses noteheads far above the staff (ledger lines)
             // and notes in other voices on the same staff.
-            for (const gm of staffLine.Measures) {
-                const mRelX: number = gm.PositionAndShape?.RelativePosition?.x ?? 0;
-                for (const gse of gm.staffEntries) {
-                    if (!gse.graphicalVoiceEntries) { continue; }
-                    for (const gve2 of gse.graphicalVoiceEntries as any[]) {
-                        const vfNote2: any = gve2.vfStaveNote;
-                        if (!vfNote2 || typeof vfNote2.getKeyProps !== "function") { continue; }
-                        const vfStave2: any = vfNote2.getStave?.();
-                        if (!vfStave2) { continue; }
-                        const kps2: any[] = vfNote2.getKeyProps();
-                        if (!kps2 || kps2.length === 0) { continue; }
-                        const gvex2: number = gve2.PositionAndShape?.RelativePosition?.x;
-                        if (gvex2 === undefined || gvex2 === null) { continue; }
-                        const entryRelX2: number = gse.PositionAndShape?.RelativePosition?.x ?? 0;
-                        const noteX2: number = gvex2 + entryRelX2 + mRelX;
-                        if (noteX2 < Math.min(startX, endX) || noteX2 > Math.max(startX, endX)) { continue; }
-                        const vfStaveY2: number = vfStave2.getY();
-                        // Check each notehead in the chord
-                        for (const kp of kps2) {
-                            const noteYPx2: number = vfStave2.getYForLine(kp.line);
-                            const noteY2: number = (noteYPx2 - vfStaveY2) / unitInPixels;
-                            if (isAbove && noteY2 < startY) {
-                                points.push(new PointF2D(noteX2, noteY2));
-                            } else if (!isAbove && noteY2 > startY) {
-                                points.push(new PointF2D(noteX2, noteY2));
+            // Iterate all staffLines in the system so other-staff notes (treble
+            // noteheads above a bass-staff chord on ledger lines) are included.
+            const isCrossStaffInj: boolean = !!this.slur?.isCrossed();
+            // Inject from all system staves so the bezier can clear noteheads
+            // above the chord even from the sibling staff (e.g. treble noteheads
+            // above a bass-staff chord on ledger lines).
+            // Cap the vertical distance so obstacles far above the chord (another
+            // staff / another system) don't balloon the slur.
+            const injMaxDist: number = isCrossStaffInj ? Infinity : 8; // 2 staff heights
+            const musicSysInj: any = staffLine.ParentMusicSystem;
+            const injStaffLines: StaffLine[] = musicSysInj
+                ? musicSysInj.StaffLines : [staffLine];
+            const currentStaffRelY: number = staffLine.PositionAndShape.RelativePosition.y;
+            for (const injSl of injStaffLines) {
+                // Staff Y layout is finalized BEFORE calculateSlurs, so the
+                // RelativePosition difference is the final content-aware staff gap.
+                const staffYOffset: number = injSl.PositionAndShape.RelativePosition.y - currentStaffRelY;
+                // Skip unrelated instrument staves
+                if (isCrossStaffInj && myInstrument) {
+                    const otherInst: any = injSl.Measures.length > 0
+                        ? (injSl.Measures[0] as any).parentStaff?.ParentInstrument : undefined;
+                    if (otherInst !== myInstrument) { continue; }
+                }
+                for (const gm of injSl.Measures) {
+                    const mRelX: number = gm.PositionAndShape?.RelativePosition?.x ?? 0;
+                    const mRelY: number = gm.PositionAndShape?.RelativePosition?.y ?? 0;
+                    for (const gse of gm.staffEntries) {
+                        if (!gse.graphicalVoiceEntries) { continue; }
+                        for (const gve2 of gse.graphicalVoiceEntries as any[]) {
+                            const gvex2: number = gve2.PositionAndShape?.RelativePosition?.x;
+                            if (gvex2 === undefined || gvex2 === null) { continue; }
+                            const entryRelX2: number = gse.PositionAndShape?.RelativePosition?.x ?? 0;
+                            const noteX2: number = gvex2 + entryRelX2 + mRelX;
+                            if (noteX2 < Math.min(startX, endX) || noteX2 > Math.max(startX, endX)) { continue; }
+                            // Match the clearance t-range: obstacles near the slur's endpoints
+                            // can't be cleared by bowing (bezier is nearly flat there), so
+                            // don't inject/mark them as relevant obstacles.
+                            const injT: number = (noteX2 - startX) / (endX - startX);
+                            if (injT < 0.15 || injT > 0.85) { continue; }
+                            // Use OSMD model Y, converted to the current staff's space via
+                            // the final computed staff gap (matches rendered SVG).
+                            const gveRelY2: number = gve2.PositionAndShape?.RelativePosition?.y ?? 0;
+                            const entryRelY2: number = gse.PositionAndShape?.RelativePosition?.y ?? 0;
+                            const borderTop2: number = (gve2.PositionAndShape as any)?.BorderTop ?? 0;
+                            const borderBottom2: number = (gve2.PositionAndShape as any)?.BorderBottom ?? 0;
+                            const topY2: number = gveRelY2 + entryRelY2 + mRelY + staffYOffset + (isAbove ? borderTop2 : 0);
+                            const bottomY2: number = gveRelY2 + entryRelY2 + mRelY + staffYOffset + (!isAbove ? -borderBottom2 : 0);
+                            const clearanceMargin: number = 0.8;
+                            // Inject notehead top/bottom
+                            if (isAbove && topY2 < startY + clearanceMargin
+                                && startY - topY2 < injMaxDist) {
+                                points.push(new PointF2D(noteX2, topY2));
+                                this.debugSkyPoints.push(new PointF2D(noteX2, topY2));
+                                this.debugSkyCategories.push("injected");
                             }
-                        }
-                        // Also inject stem tip/base
-                        if (typeof vfNote2.hasStem === "function" && vfNote2.hasStem() && typeof vfNote2.getStemExtents === "function") {
-                            const stem2: any = vfNote2.getStemExtents();
-                            const stTipY2: number = (stem2.topY - vfStaveY2) / unitInPixels;
-                            const stBaseY2: number = (stem2.baseY - vfStaveY2) / unitInPixels;
-                            if (isAbove && stTipY2 < startY) { points.push(new PointF2D(noteX2, stTipY2)); }
-                            if (!isAbove && stBaseY2 > startY) { points.push(new PointF2D(noteX2, stBaseY2)); }
+                            if (!isAbove && bottomY2 > startY - clearanceMargin
+                                && bottomY2 - startY < injMaxDist) {
+                                points.push(new PointF2D(noteX2, bottomY2));
+                                this.debugSkyPoints.push(new PointF2D(noteX2, bottomY2));
+                                this.debugSkyCategories.push("injected");
+                            }
                         }
                     }
                 }
@@ -228,8 +257,6 @@ export class GraphicalSlur extends GraphicalCurve {
         const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
         const minT: number = 0.15;
         const maxT: number = 0.85;
-        const noteCount: number = this.staffEntries.length;
-        const maxMult: number = noteCount <= 3 ? 1.5 : Math.max(0.6, 1.5 - (noteCount - 3) / 7 * 0.9);
         if (isAbove) {
             const startI: number = this.slur?.isCrossed() ? localPointCount : 0;
             for (let i: number = startI; i < points.length; i++) {
@@ -240,10 +267,10 @@ export class GraphicalSlur extends GraphicalCurve {
                 if (tOrig < minT || tOrig > maxT) { continue; }
                 const trans: PointF2D = transformedPoints[i];
                 if (trans.y <= 0) { continue; }
-                const needed: number = Math.min(
-                    trans.y / (3 * tOrig * (1 - tOrig)),
-                    trans.y * maxMult,
-                );
+                // Exact bezier height formula: B(t) = 3*t*(1-t) * cpY
+                // To clear obstacle at height trans.y above chord, solve for cpY:
+                //   cpY = trans.y / (3 * t * (1-t))
+                const needed: number = trans.y / (3 * tOrig * (1 - tOrig));
                 if (needed > this.mergedClearanceCpY) {
                     this.mergedClearanceCpY = needed;
                 }
@@ -269,10 +296,7 @@ export class GraphicalSlur extends GraphicalCurve {
                 if (tOrig < minT || tOrig > maxT) { continue; }
                 const trans: PointF2D = transformedPoints[i];
                 if (trans.y <= 0) { continue; }
-                const needed: number = Math.min(
-                    trans.y / (3 * tOrig * (1 - tOrig)),
-                    trans.y * maxMult,
-                );
+                const needed: number = trans.y / (3 * tOrig * (1 - tOrig));
                 const neededBelow: number = -needed;
                 if (neededBelow < this.mergedClearanceCpY) {
                     this.mergedClearanceCpY = neededBelow;

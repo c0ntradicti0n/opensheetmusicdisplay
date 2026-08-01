@@ -64,3 +64,24 @@ for (const name of MXL_FILES) {
   }
   (globalThis as any).__raw__[`test/data/${name}`] = raw;
 }
+
+// Preload woff2 font data for SVG annotation in debug tests.
+const FONT_WOFF2: [string, string][] = [
+  ["Bravura", "bravura/bravura.woff2"],
+  ["Gonville", "gonville/gonville.woff2"],
+];
+const fontData: Record<string, string> = {};
+for (const [family, relPath] of FONT_WOFF2) {
+  const url: string = `/external/vexflow/node_modules/@vexflow-fonts/${relPath}`;
+  const resp: Response = await fetch(url);
+  if (resp.ok) {
+    const buf: ArrayBuffer = await resp.arrayBuffer();
+    const bytes: Uint8Array = new Uint8Array(buf);
+    let raw: string = "";
+    for (let i: number = 0; i < bytes.length; i++) {
+      raw += String.fromCharCode(bytes[i]);
+    }
+    fontData[family] = btoa(raw);
+  }
+}
+(globalThis as any).__fontData__ = fontData;
