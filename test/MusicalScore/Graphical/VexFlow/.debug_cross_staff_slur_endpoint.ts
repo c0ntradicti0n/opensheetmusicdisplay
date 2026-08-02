@@ -628,7 +628,9 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
 .problem-marked{stroke:#c00!important;stroke-width:4px!important}
 .problem-rect{fill:none;stroke:#c00;stroke-width:1}
 .problem-label{font:9px sans-serif;fill:#c00}
-.problem-bg{fill:rgba(255,255,255,0.5);stroke:#c00;stroke-width:1;rx:2}`;
+.problem-bg{fill:rgba(255,255,255,0.5);stroke:#c00;stroke-width:1;rx:2}
+.balloon-slur{fill:rgba(40,120,255,0.3)!important}
+.balloon-marked{stroke:#06c!important;stroke-width:3px!important;stroke-dasharray:6,3}`;
     clone.insertBefore(styleEl, clone.firstChild);
 
     // Pre-compute adjacent-system overlaps for leak detection
@@ -654,7 +656,12 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
               )
             : false;
         const isLeak: boolean = s.leakOverlap;
-        const isProblem: boolean = hasCollision || isLeak;
+        // Ballooning = bow height / span ratio above a threshold. Default angle-based
+        // slurs have ratio ~0.10; content-driven clearance pushes it higher. 0.4 is
+        // ~4x the normal baseline and clearly indicates an over-inflated curve.
+        const balloonRatio: number = s.cpY_osmd / Math.max(0.01, Math.abs(s.spanX));
+        const isBalloon: boolean = balloonRatio > 0.4;
+        const isProblem: boolean = hasCollision || isLeak || isBalloon;
 
         // Draw obstacle points as circles for ALL slurs (not just problem ones)
         if (s.obstacleSvgPoints.length > 0 && s.startCp) {
@@ -682,15 +689,27 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
         const slurGroup: Element | null = clone.querySelector(`[id="${slurId}"]`);
         if (!slurGroup) { continue; }
 
-        slurGroup.classList.add("problem-slur", "problem-marked");
+        // Ballooning gets blue dashed marking; collision/leak stays red.
+        if (isBalloon && !hasCollision && !isLeak) {
+            slurGroup.classList.add("balloon-slur", "balloon-marked");
+        } else {
+            slurGroup.classList.add("problem-slur", "problem-marked");
+        }
 
         const p2: Element | null = slurGroup.querySelector("path");
         if (p2) {
             p2.removeAttribute("stroke");
             p2.removeAttribute("fill");
-            p2.setAttribute("fill", "rgba(255,40,40,0.35)");
-            p2.setAttribute("stroke", "#c00");
-            p2.setAttribute("stroke-width", "4");
+            if (isBalloon && !hasCollision && !isLeak) {
+                p2.setAttribute("fill", "rgba(40,120,255,0.3)");
+                p2.setAttribute("stroke", "#06c");
+                p2.setAttribute("stroke-width", "3");
+                p2.setAttribute("stroke-dasharray", "6 3");
+            } else {
+                p2.setAttribute("fill", "rgba(255,40,40,0.35)");
+                p2.setAttribute("stroke", "#c00");
+                p2.setAttribute("stroke-width", "4");
+            }
         }
 
         // Bbox rect around the slur path
@@ -723,6 +742,7 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
         const lbls: string[] = [];
         if (hasCollision) { lbls.push(`collide obs=${s.obstacleCount}`); }
         if (isLeak) { lbls.push("leak"); }
+        if (isBalloon) { lbls.push(`balloon r=${balloonRatio.toFixed(2)}`); }
         if (!s.startCp) { continue; }
         let lx: number = s.svgStart.x;
         let ly: number = Math.max(s.svgStartCp.y, s.svgEndCp.y) + 18;
