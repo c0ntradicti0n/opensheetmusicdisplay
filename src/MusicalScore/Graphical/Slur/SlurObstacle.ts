@@ -107,6 +107,51 @@ function siblingStaffLines(sl: StaffLine): StaffLine[] {
 }
 
 /**
+ * Layout-time reservation collector: own-staff notehead/stem obstacles in a
+ * staff-relative pixel frame (staff origin at 0). Reads VF geometry anchored at
+ * the stave origin — `getNoteHeadBounds().yTop − stave.getY()` is the
+ * deterministic notehead offset once a note is formatted, so it is valid before
+ * the stave is positioned at draw. Produces the same relative geometry as the
+ * draw-time absolute collector for same-staff content, so the reserved skyline
+ * envelope equals the final arc. Cross-staff siblings are skipped: cross-staff
+ * slurs are excluded from the reservation and sibling absolute positions are
+ * not final before spacing.
+ */
+export function collectSlurObstaclesStaffRelative(ctx: CollectContext): SlurObstacle[] {
+    const out: SlurObstacle[] = [];
+    for (const gm of ctx.staffLine.Measures) {
+        const mRelX: number = gm.PositionAndShape?.RelativePosition?.x ?? 0;
+        for (const gse of gm.staffEntries) {
+            if (!gse.graphicalVoiceEntries) { continue; }
+            for (const gve of gse.graphicalVoiceEntries) {
+                const vf: VF.StemmableNote | undefined = (gve as VexFlowVoiceEntry).vfStaveNote;
+                if (!vf) { continue; }
+                if (ctx.excludeNotes.has(vf)) { continue; }
+                const anyNote: any = vf as any;
+                if (!anyNote.getNoteHeadBounds) { continue; } // rest / ghost note
+                const stave: any = vf.getStave?.();
+                if (!stave) { continue; }
+                const bounds: { yTop: number, yBottom: number } = anyNote.getNoteHeadBounds();
+                const x: number = vf.getAbsoluteX() + vf.getGlyphWidth() / 2 - stave.getX() + mRelX * unitInPixels;
+                if (x < Math.min(ctx.startXPx, ctx.endXPx) || x > Math.max(ctx.startXPx, ctx.endXPx)) { continue; }
+
+                const headY: number = ctx.above ? bounds.yTop : bounds.yBottom;
+                push(x, headY - stave.getY(), "notehead", false, ctx, out);
+
+                // Stem tip only when the stem points toward the slur side.
+                const dir: number = vf.getStemDirection?.() ?? 0;
+                const towardSlur: boolean = (ctx.above && dir === 1) || (!ctx.above && dir === -1);
+                if (towardSlur && anyNote.getStemExtents) {
+                    const ext: { topY: number, baseY: number } = anyNote.getStemExtents();
+                    push(x, ext.topY - stave.getY(), "stem", false, ctx, out);
+                }
+            }
+        }
+    }
+    return out;
+}
+
+/**
  * Collect obstacle points a slur must clear, all in the rendered SVG-pixel
  * frame (same frame as the endpoints and the SlurQualityReporter).
  *

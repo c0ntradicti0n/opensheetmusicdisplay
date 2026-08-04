@@ -92,4 +92,24 @@ describe("SlurLiftSolver", () => {
         const len = Math.sqrt(80 * 80 + 60 * 60); // 100
         expect(apexPerp(start, steepEnd, r, true)).lessThan(0.5 * len + 1);
     });
+
+    it("translation-invariant: shifting all inputs yields the same local curve", () => {
+        // The layout-time reservation (staff-relative frame) and the draw-time
+        // solve (absolute frame) must produce the identical local bezier for the
+        // same relative geometry — this is what keeps the reserved skyline band
+        // equal to the final arc (no over/under-spacing).
+        const obs: SlurLiftObstacle[] = [
+            { xPx: 30, yPx: -15 }, { xPx: 55, yPx: -25 }, { xPx: 75, yPx: -10 },
+        ];
+        const a = solveSlurLift(new PointF2D(0, 0), new PointF2D(100, 0), obs, BASE);
+        const dx: number = 37.5, dy: number = -12.25; // arbitrary shift (staff y offset)
+        const shiftedStart = new PointF2D(dx, dy);
+        const shiftedEnd = new PointF2D(100 + dx, dy);
+        const shiftedObs: SlurLiftObstacle[] = obs.map(o => ({ xPx: o.xPx + dx, yPx: o.yPx + dy }));
+        const b = solveSlurLift(shiftedStart, shiftedEnd, shiftedObs, BASE);
+        for (const [an, bn] of [[a.c1, b.c1], [a.c2, b.c2]] as Array<[PointF2D, PointF2D]>) {
+            expect(bn.x - shiftedStart.x).closeTo(an.x, 1e-9);
+            expect(bn.y - shiftedStart.y).closeTo(an.y, 1e-9);
+        }
+    });
 });

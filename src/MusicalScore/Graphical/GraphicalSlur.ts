@@ -17,7 +17,7 @@ import { unitInPixels } from "./VexFlow/VexFlowMusicSheetDrawer";
 import { GraphicalMeasure } from "./GraphicalMeasure";
 import { SLUR_CLEARABLE_MIN_T, SLUR_CLEARABLE_MAX_T } from "./SlurQualityConstants";
 import { solveSlurLift, SlurLiftResult } from "./Slur/SlurLiftSolver";
-import { collectSlurObstacles, CollectContext, SlurObstacle } from "./Slur/SlurObstacle";
+import { collectSlurObstacles, collectSlurObstaclesStaffRelative, CollectContext, SlurObstacle } from "./Slur/SlurObstacle";
 
 export class GraphicalSlur extends GraphicalCurve {
     public slur: Slur;
@@ -96,10 +96,11 @@ export class GraphicalSlur extends GraphicalCurve {
     }
 
     /**
-     * Cheap layout-time skyline reservation: reserve the natural-bow envelope
-     * (no obstacle solve, no VF geometry) so later layout passes (measure
-     * numbers, ornaments, dynamics, lyrics) clear the slur band. The final
-     * obstacle-aware curve is solved at draw time in calculateCurveUnified.
+     * Layout-time skyline reservation: run the obstacle-aware unified solve in a
+     * staff-relative pixel frame (staff origin at 0), so the reserved skyline
+     * band equals the final arc for same-staff content — and the inter-staff /
+     * inter-system spacing (calculateSystemYLayout) grows to fit it. The final
+     * curve is re-solved at draw time against the rendered positions.
      */
     public reserveSkyline(rules: EngravingRules): void {
         const {start: slurStartNote, end: slurEndNote, staffLine} = this.resolveSlurNotes();
@@ -111,19 +112,41 @@ export class GraphicalSlur extends GraphicalCurve {
         const yDir: number = isAbove ? -1 : 1;
         const startY: number = ep.startY + yDir * rules.SlurNoteHeadYOffset;
         const endY: number = ep.endY + yDir * rules.SlurNoteHeadYOffset;
+
+        const excludeNotes: Set<VF.StemmableNote> = new Set<VF.StemmableNote>();
+        const startVf: VF.StemmableNote = (slurStartNote as VexFlowGraphicalNote)?.vfnote?.[0];
+        const endVf: VF.StemmableNote = (slurEndNote as VexFlowGraphicalNote)?.vfnote?.[0];
+        if (startVf) { excludeNotes.add(startVf); }
+        if (endVf) { excludeNotes.add(endVf); }
+
+        const ctx: CollectContext = {
+            staffLine,
+            startXPx: ep.startX * unitInPixels, endXPx: ep.endX * unitInPixels,
+            startYPx: startY * unitInPixels, endYPx: endY * unitInPixels,
+            above: isAbove,
+            excludeNotes,
+            minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
+        };
+        const obstacles: SlurObstacle[] = collectSlurObstaclesStaffRelative(ctx);
+
         const result: SlurLiftResult = solveSlurLift(
-            new PointF2D(ep.startX, startY), new PointF2D(ep.endX, endY), [],
+            new PointF2D(ep.startX * unitInPixels, startY * unitInPixels),
+            new PointF2D(ep.endX * unitInPixels, endY * unitInPixels),
+            obstacles,
             {
                 minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
                 k: GraphicalSlur.k, d: GraphicalSlur.d,
                 tangentAngleDeg: rules.SlurTangentMinAngle,
-                marginPx: 0, slackPx: 0, maxBowRatio: GraphicalSlur.maxBowRatio, above: isAbove,
+                marginPx: GraphicalSlur.injectClearanceMargin * unitInPixels,
+                slackPx: GraphicalSlur.antiBalloonSlack * unitInPixels,
+                maxBowRatio: GraphicalSlur.maxBowRatio,
+                above: isAbove,
             },
         );
         this.bezierStartPt = new PointF2D(ep.startX, startY);
         this.bezierEndPt = new PointF2D(ep.endX, endY);
-        this.bezierStartControlPt = result.c1;
-        this.bezierEndControlPt = result.c2;
+        this.bezierStartControlPt = new PointF2D(result.c1.x / unitInPixels, result.c1.y / unitInPixels);
+        this.bezierEndControlPt = new PointF2D(result.c2.x / unitInPixels, result.c2.y / unitInPixels);
         this.updateSkyBottomLine(staffLine, skyBottomLineCalculator);
     }
 

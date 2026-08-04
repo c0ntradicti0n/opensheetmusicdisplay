@@ -411,6 +411,10 @@ export class EngravingRules {
     public GraceLineWidth: number;
     public MinimumStaffLineDistance: number;
     public MinSkyBottomDistBetweenStaves: number;
+    /** Max skyline height above a staff that inflates inter-staff/system spacing.
+     *  Slur skyline reservations reach up to this height above the staff top line;
+     *  without it an arc higher than StaffHeight could collide with the staff above. */
+    public MaxSkylineAboveStaff: number;
     /** Whether to snap the y positions of stafflines and music systems to positions where the
      *  (1px) staff lines render as crisp single pixel rows, instead of being spread (anti-aliased)
      *  over two half-covered, gray-ish pixel rows. Default true.
@@ -658,6 +662,7 @@ export class EngravingRules {
         this.BetweenStaffDistance = 8.0;
         this.MinimumStaffLineDistance = 7.0;
         this.MinSkyBottomDistBetweenStaves = 1.0; // default. compacttight mode sets it to 1.0 (as well).
+        this.MaxSkylineAboveStaff = 8.0; // 2×StaffHeight: lets slur reservations inflate spacing
         this.SnapStafflinesToCrispPixels = true;
 
         // System Sizing and Label Variables

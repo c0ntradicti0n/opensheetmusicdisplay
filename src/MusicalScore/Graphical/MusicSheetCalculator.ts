@@ -996,11 +996,12 @@ export abstract class MusicSheetCalculator {
         // will have reasonable values only between ObjectsBorders (eg StaffEntries)
         this.calculateSkyBottomLines();
 
-        // Finalize staff Y positions BEFORE slurs: slurs must avoid obstacles at the
-        // rendered staff positions. Previously the Y layout ran after calculateSlurs,
-        // so slurs used only the minimum RelativePosition gap, which differs from the
-        // final (content-aware) staff spacing. The slurs themselves are thin curves and
-        // don't need to inflate the inter-staff spacing.
+        // Reserve slur skyline envelopes BEFORE spacing: slur objects are created
+        // and their arcs written into the staffline skyline here, so the inter-staff
+        // and inter-system spacing (calculateSystemYLayout) grows to fit them. The
+        // final obstacle-aware curve is re-solved at draw time against the rendered
+        // positions (the same-staff result is identical — the solver is
+        // staff-relative, see GraphicalSlur.reserveSkyline).
         // update all StaffLine's Borders
         // create temporary Object, just to call the methods (in order to avoid declaring them static)
         for (let idx2: number = 0, len2: number = this.musicSystems.length; idx2 < len2; ++idx2) {
@@ -1010,6 +1011,14 @@ export abstract class MusicSheetCalculator {
                 this.updateStaffLineBorders(staffLine);
             }
         }
+        if (!this.leadSheet && this.rules.RenderSlurs) {
+            this.calculateSlurs();
+        }
+        // Position lyrics before spacing too: their extent goes into the staffline
+        // BottomLine, so inter-staff/inter-system spacing reserves room for lyrics
+        // as well as slur skyline envelopes (prevents lyrics colliding with a slur
+        // or content on the staff below).
+        this.calculateLyricsPosition();
         // calculate Y-spacing -> MusicPages are created here
         musicSystemBuilder.calculateSystemYLayout();
 
@@ -1025,10 +1034,6 @@ export abstract class MusicSheetCalculator {
         }
         if (this.rules.RenderFingerings) {
             this.calculateFingerings(); // if this is done after slurs, fingerings can be on top of slurs
-        }
-        // calculate Slurs
-        if (!this.leadSheet && this.rules.RenderSlurs) {
-            this.calculateSlurs();
         }
         this.calculateGlissandi();
         //Calculate measure number skyline AFTER slurs
@@ -1078,9 +1083,6 @@ export abstract class MusicSheetCalculator {
         // (must come after mood/unknown expressions so OSMD skyline is populated,
         //  allowing rehearsal marks to check for overlap and adjust yOffset accordingly)
         this.calculateRehearsalMarks();
-
-        // calculate all LyricWords Positions
-        this.calculateLyricsPosition();
 
         // calculate Comments for each Staffline
         this.calculateComments();
