@@ -1,21 +1,20 @@
 /* eslint-disable @typescript-eslint/typedef, max-len */
 import { expect } from "vitest";
-import { IXmlElement } from "../../../../src/Common/FileIO/Xml";
-import { MusicSheet } from "../../../../src/MusicalScore/MusicSheet";
-import { MusicSheetReader } from "../../../../src/MusicalScore/ScoreIO/MusicSheetReader";
-import { VexFlowMusicSheetCalculator } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowMusicSheetCalculator";
-import { TestUtils } from "../../../Util/TestUtils";
-import { VexFlowMeasure } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowMeasure";
 import { GraphicalNote } from "../../../../src/MusicalScore/Graphical/GraphicalNote";
 import { GraphicalMusicSheet } from "../../../../src/MusicalScore/Graphical/GraphicalMusicSheet";
 import { VexFlowGraphicalNote } from "../../../../src/MusicalScore/Graphical/VexFlow";
 import * as VF from "vexflow";
-import { unitInPixels, VexFlowMusicSheetDrawer } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowMusicSheetDrawer";
+import { unitInPixels } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowMusicSheetDrawer";
 import { GraphicalSlur } from "../../../../src/MusicalScore/Graphical/GraphicalSlur";
-import { SvgVexFlowBackend } from "../../../../src/MusicalScore/Graphical/VexFlow/SvgVexFlowBackend";
-import { DrawingParameters } from "../../../../src/MusicalScore/Graphical/DrawingParameters";
 import { EngravingRules } from "../../../../src/MusicalScore/Graphical/EngravingRules";
-import JSZip from "jszip";
+import { SLUR_CLEARABLE_MIN_T, SLUR_CLEARABLE_MAX_T, SLUR_COLLISION_TOLERANCE_PX } from "../../../../src/MusicalScore/Graphical/SlurQualityConstants";
+import {
+    loadScore,
+    prepareMeasures,
+    renderToSvg,
+    getSlurQuality,
+    aggregateSlurQuality,
+} from "../../../Util/SlurQualityReporter";
 // fs/path imported lazily in writeAnnotatedSvg (browser mode lacks Node builtins)
 
 // ── Data types ───────────────────────────────────────────────────────────────
@@ -61,54 +60,6 @@ const SCORES: ScoreConfig[] = [
     { name: "Beethoven", path: "Beethoven_AnDieFerneGeliebte.xml", maxCpY: 6.0 },
     { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0 },
 ];
-
-// ── Score loading ────────────────────────────────────────────────────────────
-
-async function loadScore(path: string): Promise<{ calc: VexFlowMusicSheetCalculator, gms: GraphicalMusicSheet, reader: MusicSheetReader }> {
-    let xmlString: string;
-    if (path.endsWith(".mxl")) {
-        const raw: string = TestUtils.getMXL(path);
-        const zip: JSZip = await JSZip.loadAsync(raw, { base64: false, checkCRC32: false });
-        const containerXml: string = await zip.file("META-INF/container.xml").async("text");
-        const containerDoc: Document = new DOMParser().parseFromString(containerXml, "text/xml");
-        const rootfileEl: Element = containerDoc.querySelector("rootfile");
-        const musicXmlPath: string = rootfileEl?.getAttribute("full-path") ?? "";
-        if (!musicXmlPath) { throw new Error("No rootfile in container.xml"); }
-        xmlString = await zip.file(musicXmlPath).async("text");
-    } else {
-        xmlString = new XMLSerializer().serializeToString(TestUtils.getScore(path));
-    }
-    const score: Document = new DOMParser().parseFromString(xmlString, "text/xml");
-    const partwise: Element = TestUtils.getPartWiseElement(score);
-    const reader: MusicSheetReader = new MusicSheetReader();
-    const calc: VexFlowMusicSheetCalculator = new VexFlowMusicSheetCalculator(reader.rules);
-    const sheet: MusicSheet = reader.createMusicSheet(new IXmlElement(partwise), path);
-    const gms: GraphicalMusicSheet = new GraphicalMusicSheet(sheet, calc);
-    calc.calculate();
-    return { calc, gms, reader };
-}
-
-// ── SVG rendering ────────────────────────────────────────────────────────────
-
-function renderToSvg(gms: GraphicalMusicSheet, rules: EngravingRules): SVGSVGElement {
-    const container: HTMLElement = document.createElement("div");
-    container.style.position = "absolute";
-    container.style.left = "-9999px";
-    document.body.appendChild(container);
-    const dp: DrawingParameters = new DrawingParameters();
-    dp.Rules = rules;
-    const drawer: VexFlowMusicSheetDrawer = new VexFlowMusicSheetDrawer(dp);
-    for (const page of gms.MusicPages) {
-        if (page.PageNumber > rules.MaxPageToDrawNumber) { break; }
-        const backend: SvgVexFlowBackend = new SvgVexFlowBackend(rules);
-        backend.graphicalMusicPage = page;
-        backend.initialize(container, 1.0);
-        drawer.Backends.push(backend);
-    }
-    drawer.drawSheet(gms);
-    const svg: SVGSVGElement = container.querySelector("svg")!;
-    return svg;
-}
 
 // ── SVG BBox helpers ─────────────────────────────────────────────────────────
 
@@ -157,24 +108,6 @@ function querySlurBBoxes(svg: SVGSVGElement, vfIdToXmlId: Map<string, string>): 
 }
 
 // ── Coordinate helpers ───────────────────────────────────────────────────────
-
-function prepareMeasures(gms: GraphicalMusicSheet): void {
-    const pages: any[] = gms.MusicPages;
-    for (const page of pages) {
-        for (const sys of page.MusicSystems) {
-            for (const col of sys.GraphicalMeasures) {
-                for (const m of col) {
-                    if ((m as VexFlowMeasure).setAbsoluteCoordinates) {
-                        (m as VexFlowMeasure).setAbsoluteCoordinates(
-                            m.PositionAndShape.AbsolutePosition.x * 10,
-                            m.PositionAndShape.AbsolutePosition.y * 10,
-                        );
-                    }
-                }
-            }
-        }
-    }
-}
 
 function toSvgCoords(osmdX: number, osmdY: number, sl: any): { x: number, y: number } {
     const abs: any = sl.PositionAndShape?.AbsolutePosition;
@@ -474,7 +407,7 @@ function bezierCollidesWithObstacles(
         const chordDy: number = ey - sy;
         const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
         const tObs: number = ((obs.x - sx) * chordDx + (obs.y - sy) * chordDy) / chordLenSq;
-        if (tObs < 0.25 || tObs > 0.75) { continue; }
+        if (tObs < SLUR_CLEARABLE_MIN_T || tObs > SLUR_CLEARABLE_MAX_T) { continue; }
         let bestIdx: number = -1;
         let bestDist: number = Infinity;
         for (let i: number = 0; i <= N; i++) {
@@ -483,10 +416,9 @@ function bezierCollidesWithObstacles(
         }
         if (bestIdx < 0) { continue; }
         const by: number = sampleY[bestIdx];
-        // 5px tolerance — bezier clearing within half a staff space is acceptable
-        const TOLERANCE: number = 5;
-        if (above && by > obs.y + TOLERANCE) { return true; }
-        if (!above && by < obs.y - TOLERANCE) { return true; }
+        // Tolerance shared with SlurQualityConstants — clearing within half a staff space is acceptable
+        if (above && by > obs.y + SLUR_COLLISION_TOLERANCE_PX) { return true; }
+        if (!above && by < obs.y - SLUR_COLLISION_TOLERANCE_PX) { return true; }
     }
     return false;
 }
@@ -808,9 +740,13 @@ describe("Debug slur obstacles", () => {
             let svg: SVGSVGElement | null;
             let noteheadBBoxes: Map<string, BBoxRect>;
             let slurBBoxes: Map<string, BBoxRect>;
+            let gmsRef: GraphicalMusicSheet;
+            let rulesRef: EngravingRules;
 
             beforeAll(async () => {
                 const { calc, gms } = await loadScore(cfg.path);
+                gmsRef = gms;
+                rulesRef = calc.rules;
                 prepareMeasures(gms);
 
                 // Render first — this calls calculateCurve which populates debugSkyPoints
@@ -916,12 +852,17 @@ describe("Debug slur obstacles", () => {
             // Relies on mergedClearanceCpY check above (obstacle clearance).
 
             it("above-placement non-cross slurs have obstacle clearance", () => {
-                const above: SlurInfo[] = slurs.filter(s => !s.isCrossed);
-                if (above.length === 0) { return; }
-                const active: number = above.filter(s => s.mergedClearance > 0).length;
-                // Injection adds start/end noteheads for non-cross above slurs
-                expect(active, `${active}/${above.length} have mergedClearance>0`)
-                    .greaterThan(Math.max(1, Math.floor(above.length * 0.2)));
+                // Ground-truth clearance from the reporter (single SVG-pixel frame),
+                // not the legacy mergedClearanceCpY internal (unset by the unified
+                // solver). A non-cross above slur with in-window obstacles must not
+                // collide with them.
+                const reports = getSlurQuality(gmsRef, svg as SVGSVGElement, rulesRef);
+                const aboveWithObs = reports.filter(
+                    r => !r.isCrossed && r.placement === "above" && r.obstacleCount > 0 && r.trusted);
+                if (aboveWithObs.length === 0) { return; }
+                const colliding = aboveWithObs.filter(r => r.collision).map(r => r.id);
+                expect(colliding, `${colliding.length}/${aboveWithObs.length} colliding: ${colliding.join(",")}`)
+                    .to.deep.equal([]);
             });
 
             // ── Debug dump ──────────────────────────────────────────────
@@ -963,6 +904,20 @@ describe("Debug slur obstacles", () => {
                 }
 
                 if (svg) { dumpSvgStructure(svg); }
+            });
+
+            it("prints ground-truth quality report", () => {
+                if (!svg || !gmsRef) { return; }
+                const reports = getSlurQuality(gmsRef, svg, rulesRef);
+                const agg = aggregateSlurQuality(reports);
+                console.warn(`\n  ── Ground-truth report (${reports.length} slurs) ──`);
+                console.warn(`    frame=${reports[0]?.frame ?? "?"} trusted=${reports.filter(r => r.trusted).length}/${reports.length} untrusted=${agg.untrusted}`);
+                console.warn(`    collisions=${agg.collisions} balloons=${agg.balloons} leaks=${agg.leaks} leakOverlaps=${agg.leakOverlaps}`);
+                console.warn(`    meanClearancePx=${agg.meanClearancePx.toFixed(1)} minClearancePx=${agg.minClearancePx.toFixed(1)} meanBowRatio=${agg.meanBowRatio.toFixed(3)} maxBowRatio=${agg.maxBowRatio.toFixed(3)}`);
+                for (const r of reports) {
+                    const flag: string = r.collision ? " 💥" : r.balloon ? " 🎈" : "";
+                    console.warn(`    ${r.id}${flag} frame=${r.frame} crossed=${r.isCrossed} ${r.placement} clearance=${r.clearancePx.toFixed(1)}px@t=${r.clearanceT.toFixed(2)} bow=${r.bowPx.toFixed(1)}px r=${r.bowRatio.toFixed(3)} obs=${r.obstacleCount} leak=${r.leakPx.toFixed(0)}${r.trusted ? "" : ` !${r.reasons.join(",")}`}`);
+                }
             });
 
             // Dichterliebe-specific: cross-staff slurs with positive bow

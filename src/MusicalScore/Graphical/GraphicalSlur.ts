@@ -15,6 +15,9 @@ import { VexFlowGraphicalNote } from "./VexFlow";
 import * as VF from "vexflow";
 import { unitInPixels } from "./VexFlow/VexFlowMusicSheetDrawer";
 import { GraphicalMeasure } from "./GraphicalMeasure";
+import { SLUR_CLEARABLE_MIN_T, SLUR_CLEARABLE_MAX_T } from "./SlurQualityConstants";
+import { solveSlurLift, SlurLiftResult } from "./Slur/SlurLiftSolver";
+import { collectSlurObstacles, CollectContext, SlurObstacle } from "./Slur/SlurObstacle";
 
 export class GraphicalSlur extends GraphicalCurve {
     public slur: Slur;
@@ -59,6 +62,166 @@ export class GraphicalSlur extends GraphicalCurve {
     }
 
     public calculateCurve(rules: EngravingRules): void {
+        if (GraphicalSlur.useUnifiedSolver) {
+            this.calculateCurveUnified(rules);
+        } else {
+            this.calculateCurveLegacy(rules);
+        }
+    }
+
+    /**
+     * Unified obstacle-avoidance solver (pixel-frame). Resolves endpoints via the
+     * legacy calculateStartAndEnd, collects real notehead/stem obstacles in one
+     * SVG-pixel frame, solves a constrained symmetric-cubic lift, then writes the
+     * four bezier fields (staffline-local units) and updates the skyline.
+     */
+    /** Resolve the slur's start/end GraphicalNotes and its staff line. Shared by
+     *  the unified solver and the layout-time skyline reservation. */
+    private resolveSlurNotes(): {start: GraphicalNote, end: GraphicalNote, staffLine: StaffLine} {
+        const startStaffEntry: GraphicalStaffEntry = this.staffEntries[0];
+        const endStaffEntry: GraphicalStaffEntry = this.staffEntries[this.staffEntries.length - 1];
+
+        let start: GraphicalNote = startStaffEntry.findGraphicalNoteFromNote(this.slur.StartNote);
+        if (start === undefined && this.graceStart) {
+            start = startStaffEntry.findGraphicalNoteFromGraceNote(this.slur.StartNote);
+        }
+        if (start === undefined) {
+            start = startStaffEntry.findEndTieGraphicalNoteFromNoteWithStartingSlur(this.slur.StartNote, this.slur);
+        }
+        let end: GraphicalNote = endStaffEntry.findGraphicalNoteFromNote(this.slur.EndNote);
+        if (end === undefined && this.graceEnd) {
+            end = endStaffEntry.findGraphicalNoteFromGraceNote(this.slur.EndNote);
+        }
+        return {start, end, staffLine: startStaffEntry.parentMeasure.ParentStaffLine};
+    }
+
+    /**
+     * Cheap layout-time skyline reservation: reserve the natural-bow envelope
+     * (no obstacle solve, no VF geometry) so later layout passes (measure
+     * numbers, ornaments, dynamics, lyrics) clear the slur band. The final
+     * obstacle-aware curve is solved at draw time in calculateCurveUnified.
+     */
+    public reserveSkyline(rules: EngravingRules): void {
+        const {start: slurStartNote, end: slurEndNote, staffLine} = this.resolveSlurNotes();
+        const skyBottomLineCalculator: SkyBottomLineCalculator = staffLine.SkyBottomLineCalculator;
+        this.calculatePlacement(skyBottomLineCalculator, staffLine);
+        const ep: {startX: number, startY: number, endX: number, endY: number} =
+            this.calculateStartAndEnd(slurStartNote, slurEndNote, staffLine, rules, skyBottomLineCalculator);
+        const isAbove: boolean = this.placement === PlacementEnum.Above;
+        const yDir: number = isAbove ? -1 : 1;
+        const startY: number = ep.startY + yDir * rules.SlurNoteHeadYOffset;
+        const endY: number = ep.endY + yDir * rules.SlurNoteHeadYOffset;
+        const result: SlurLiftResult = solveSlurLift(
+            new PointF2D(ep.startX, startY), new PointF2D(ep.endX, endY), [],
+            {
+                minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
+                k: GraphicalSlur.k, d: GraphicalSlur.d,
+                tangentAngleDeg: rules.SlurTangentMinAngle,
+                marginPx: 0, slackPx: 0, maxBowRatio: GraphicalSlur.maxBowRatio, above: isAbove,
+            },
+        );
+        this.bezierStartPt = new PointF2D(ep.startX, startY);
+        this.bezierEndPt = new PointF2D(ep.endX, endY);
+        this.bezierStartControlPt = result.c1;
+        this.bezierEndControlPt = result.c2;
+        this.updateSkyBottomLine(staffLine, skyBottomLineCalculator);
+    }
+
+    private calculateCurveUnified(rules: EngravingRules): void {
+        const {start: slurStartNote, end: slurEndNote, staffLine} = this.resolveSlurNotes();
+
+        const skyBottomLineCalculator: SkyBottomLineCalculator = staffLine.SkyBottomLineCalculator;
+        this.calculatePlacement(skyBottomLineCalculator, staffLine);
+
+        const startEndPoints: {startX: number, startY: number, endX: number, endY: number} =
+            this.calculateStartAndEnd(slurStartNote, slurEndNote, staffLine, rules, skyBottomLineCalculator);
+
+        const isAbove: boolean = this.placement === PlacementEnum.Above;
+        const yDir: number = isAbove ? -1 : 1;
+        const startX: number = startEndPoints.startX;
+        const endX: number = startEndPoints.endX;
+        const startY: number = startEndPoints.startY + yDir * rules.SlurNoteHeadYOffset;
+        const endY: number = startEndPoints.endY + yDir * rules.SlurNoteHeadYOffset;
+
+        // ── Convert endpoints to the rendered SVG-pixel frame (same frame as the
+        //    reporter/drawer: (local + abs) * unitInPixels). ─────────────────────
+        const abs: PointF2D = staffLine.PositionAndShape.AbsolutePosition;
+        const startXPx: number = (startX + abs.x) * unitInPixels;
+        const startYPx: number = (startY + abs.y) * unitInPixels;
+        const endXPx: number = (endX + abs.x) * unitInPixels;
+        const endYPx: number = (endY + abs.y) * unitInPixels;
+
+        // ── Own endpoint VF notes are excluded from the obstacle set. ────────────
+        const excludeNotes: Set<VF.StemmableNote> = new Set<VF.StemmableNote>();
+        const startVf: VF.StemmableNote = (slurStartNote as VexFlowGraphicalNote)?.vfnote?.[0];
+        const endVf: VF.StemmableNote = (slurEndNote as VexFlowGraphicalNote)?.vfnote?.[0];
+        if (startVf) { excludeNotes.add(startVf); }
+        if (endVf) { excludeNotes.add(endVf); }
+
+        const ctx: CollectContext = {
+            staffLine, startXPx, endXPx, startYPx, endYPx,
+            above: isAbove,
+            excludeNotes,
+            minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
+        };
+        const obstacles: SlurObstacle[] = collectSlurObstacles(ctx);
+
+        // ── Solve the constrained lift in the pixel frame. ──────────────────────
+        const result: SlurLiftResult = solveSlurLift(
+            new PointF2D(startXPx, startYPx), new PointF2D(endXPx, endYPx),
+            obstacles,
+            {
+                minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
+                k: GraphicalSlur.k, d: GraphicalSlur.d,
+                tangentAngleDeg: rules.SlurTangentMinAngle,
+                marginPx: GraphicalSlur.injectClearanceMargin * unitInPixels,
+                slackPx: GraphicalSlur.antiBalloonSlack * unitInPixels,
+                maxBowRatio: GraphicalSlur.maxBowRatio,
+                above: isAbove,
+            },
+        );
+
+        // ── Convert control points back to staffline-local units. ───────────────
+        const toLocal: (pPx: PointF2D) => PointF2D = (pPx: PointF2D): PointF2D =>
+            new PointF2D(pPx.x / unitInPixels - abs.x, pPx.y / unitInPixels - abs.y);
+        this.bezierStartPt = new PointF2D(startX, startY);
+        this.bezierEndPt = new PointF2D(endX, endY);
+        this.bezierStartControlPt = toLocal(result.c1);
+        this.bezierEndControlPt = toLocal(result.c2);
+
+        // ── Debug overlay points in staffline-local units. ──────────────────────
+        this.debugSkyPoints = obstacles.map((o) => toLocal(new PointF2D(o.xPx, o.yPx)));
+        this.debugSkyCategories = obstacles.map(
+            (o) => o.trusted ? o.kind : `${o.kind}-untrusted`);
+
+        this.updateSkyBottomLine(staffLine, skyBottomLineCalculator);
+    }
+
+    /** Feed the final bezier into the staff sky/bottom line (shared by both paths). */
+    private updateSkyBottomLine(staffLine: StaffLine, skyBottomLineCalculator: SkyBottomLineCalculator): void {
+        const isAbove: boolean = this.placement === PlacementEnum.Above;
+        const line: number[] = isAbove ? staffLine.SkyLine : staffLine.BottomLine;
+        const length: number = line.length;
+        const startIndex: number = skyBottomLineCalculator.getLeftIndexForPointX(this.bezierStartPt.x, length);
+        const endIndex: number = skyBottomLineCalculator.getLeftIndexForPointX(this.bezierEndPt.x, length);
+        const distance: number = this.bezierEndPt.x - this.bezierStartPt.x;
+        const samplingUnit: number = skyBottomLineCalculator.SamplingUnit;
+        const lineOp: (a: number, b: number) => number = isAbove ? Math.min : Math.max;
+        for (let i: number = startIndex; i < endIndex; i++) {
+            const diff: number = i / samplingUnit - this.bezierStartPt.x;
+            const curvePoint: PointF2D = this.calculateCurvePointAtIndex(Math.abs(diff) / distance);
+            let index: number = skyBottomLineCalculator.getLeftIndexForPointX(curvePoint.x, length);
+            if (index >= startIndex) {
+                line[index] = lineOp(line[index], curvePoint.y);
+            }
+            index++;
+            if (index < length) {
+                line[index] = lineOp(line[index], curvePoint.y);
+            }
+        }
+    }
+
+    private calculateCurveLegacy(rules: EngravingRules): void {
 
         // single GraphicalSlur means a single Curve, eg each GraphicalSlurObject is meant to be on the same StaffLine
         // a Slur can span more than one GraphicalSlurObjects
@@ -92,7 +255,6 @@ export class GraphicalSlur extends GraphicalCurve {
         let startY: number = startEndPoints.startY;
         let endY: number = startEndPoints.endY;
         const minAngle: number = rules.SlurTangentMinAngle;
-        const maxAngle: number = rules.SlurTangentMaxAngle;
         let points: PointF2D[];
         let localPointCount: number = 0;
 
@@ -162,7 +324,7 @@ export class GraphicalSlur extends GraphicalCurve {
             // above a bass-staff chord on ledger lines).
             // Cap the vertical distance so obstacles far above the chord (another
             // staff / another system) don't balloon the slur.
-            const injMaxDist: number = isCrossStaffInj ? Infinity : 8; // 2 staff heights
+            const injMaxDist: number = isCrossStaffInj ? Infinity : GraphicalSlur.injectMaxDistNonCross; // 2 staff heights
             const musicSysInj: any = staffLine.ParentMusicSystem;
             // Non-cross slurs stay on one staff: inject from the local staff only.
             // Sibling-staff noteheads live in a different Y band (shifted by the full
@@ -196,7 +358,7 @@ export class GraphicalSlur extends GraphicalCurve {
                             // can't be cleared by bowing (bezier is nearly flat there), so
                             // don't inject/mark them as relevant obstacles.
                             const injT: number = (noteX2 - startX) / (endX - startX);
-                            if (injT < 0.25 || injT > 0.75) { continue; }
+                            if (injT < GraphicalSlur.clearableMinT || injT > GraphicalSlur.clearableMaxT) { continue; }
                             // Use OSMD model Y, converted to the current staff's space via
                             // the final computed staff gap (matches rendered SVG).
                             const gveRelY2: number = gve2.PositionAndShape?.RelativePosition?.y ?? 0;
@@ -205,7 +367,7 @@ export class GraphicalSlur extends GraphicalCurve {
                             const borderBottom2: number = (gve2.PositionAndShape as any)?.BorderBottom ?? 0;
                             const topY2: number = gveRelY2 + entryRelY2 + mRelY + staffYOffset + (isAbove ? borderTop2 : 0);
                             const bottomY2: number = gveRelY2 + entryRelY2 + mRelY + staffYOffset + (!isAbove ? -borderBottom2 : 0);
-                            const clearanceMargin: number = 0.8;
+                            const clearanceMargin: number = GraphicalSlur.injectClearanceMargin;
                             // Inject notehead top/bottom
                             if (isAbove && topY2 < startY + clearanceMargin
                                 && startY - topY2 < injMaxDist) {
@@ -237,7 +399,6 @@ export class GraphicalSlur extends GraphicalCurve {
         const rotationMatrix: Matrix2D = Matrix2D.getRotationMatrix(rotDir * startEndLineAngleRadians);
         const transposeMatrix: Matrix2D = rotationMatrix.getTransposeMatrix();
 
-        const start2: PointF2D = new PointF2D(0, 0);
         let end2: PointF2D = new PointF2D(endX - startX, yDir * (endY - startY));
         end2 = rotationMatrix.vectorMultiplication(end2);
 
@@ -259,8 +420,8 @@ export class GraphicalSlur extends GraphicalCurve {
         const chordDx: number = endX - startX;
         const chordDy: number = endY - startY;
         const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
-        const minT: number = 0.25;
-        const maxT: number = 0.75;
+        const minT: number = GraphicalSlur.clearableMinT;
+        const maxT: number = GraphicalSlur.clearableMaxT;
         if (isAbove) {
             const startI: number = this.slur?.isCrossed() ? localPointCount : 0;
             for (let i: number = startI; i < points.length; i++) {
@@ -277,15 +438,6 @@ export class GraphicalSlur extends GraphicalCurve {
                 const needed: number = trans.y / (3 * tOrig * (1 - tOrig));
                 if (needed > this.mergedClearanceCpY) {
                     this.mergedClearanceCpY = needed;
-                }
-            }
-            // Staff-gap fallback for cross-staff slurs: if no merged obstacle
-            // detected above chord, apply a minimum lift based on staff gap.
-            if (this.slur?.isCrossed()) {
-                const staffGap: number = Math.abs(chordDy);
-                const gapMinCpY: number = staffGap * 0.7;
-                if (this.mergedClearanceCpY < gapMinCpY) {
-                    this.mergedClearanceCpY = gapMinCpY;
                 }
             }
         } else {
@@ -308,32 +460,13 @@ export class GraphicalSlur extends GraphicalCurve {
             }
         }
 
-        // Tangent slopes
-        const leftLineSlope: number = this.calculateMaxLeftSlope(transformedPoints, start2, end2);
-        const rightLineSlope: number = this.calculateMaxRightSlope(transformedPoints, start2, end2);
-        const leftLineD: number = start2.y - start2.x * leftLineSlope;
-        const rightLineD: number = end2.y - end2.x * rightLineSlope;
-
-        // Intersection point
-        const intersectionPoint: PointF2D = new PointF2D();
-        let sameSlope: boolean = false;
-        if (Math.abs(Math.abs(leftLineSlope) - Math.abs(rightLineSlope)) < 0.0001) {
-            intersectionPoint.x = end2.x / 2;
-            intersectionPoint.y = 0;
-            sameSlope = true;
-        } else {
-            intersectionPoint.x = (rightLineD - leftLineD) / (leftLineSlope - rightLineSlope);
-            intersectionPoint.y = leftLineSlope * intersectionPoint.x + leftLineD;
-        }
-
-        // Angles — original code uses minAngle only. calculateAngles was a
-        // no-op (JS passes by value), so slopes never influenced the angle.
-        // Restored no-op; merged points shape the curve via per-point clearance.
+        // S7 tangent angles: minAngle sets the natural baseline cp_y in
+        // calculateControlPoints. The slope-based intersection + calculateAngles
+        // adjustment was a pass-by-value no-op (never influenced the angle) —
+        // removed. On the study corpus mergedClearanceCpY always overrides the
+        // angle cp_y, so SlurTangentMinAngle has no measurable effect.
         const leftAngle: number = minAngle;
         const rightAngle: number = -minAngle;
-        if (!sameSlope) {
-            this.calculateAngles(leftAngle, rightAngle, leftLineSlope, rightLineSlope, maxAngle);
-        }
 
         // Control points
         const controlPoints: {leftControlPoint: PointF2D, rightControlPoint: PointF2D} =
@@ -588,44 +721,6 @@ export class GraphicalSlur extends GraphicalCurve {
     }
 
     /**
-     * This method calculates the maximum Slope of the Line from Startpoint to a Point P (here to all Points in the skyLine).
-     * It is used to calculate the startAngle of the Curve.
-     * @param points
-     * @param start
-     * @param end
-     */
-    private calculateMaxLeftSlope(points: PointF2D[], start: PointF2D, end: PointF2D): number {
-        // slope of Line from Start- to endpoint max + constraint that the Curve must be under the StartSkyLine- and under the EndSkyLinePoint
-        let maxLeftSlope: number = (end.y - start.y) / (end.x - start.x);
-        for (const point2 of points) {
-            const slope: number = (point2.y - start.y) / (point2.x - start.x);
-            if (slope > maxLeftSlope) {
-                maxLeftSlope = slope;
-            }
-        }
-        return maxLeftSlope;
-    }
-
-    /**
-     * This method calculates the maximum Slope of the Line from Endpoint to a Point P (here to all Points in the skyLine).
-     * It is used to calculate the endAngle of the Curve.
-     * @param points
-     * @param start
-     * @param end
-     */
-    private calculateMaxRightSlope(points: PointF2D[], start: PointF2D, end: PointF2D): number {
-        // slope of Line from End- to Startpoint max + constraint that the Curve must be under the StartSkyLine- and under the EndSkyLinePoint
-        let maxRightSlope: number = (start.y - end.y) / (start.x - end.x); // = (end.y - start.y) / (end.x - start.x)
-        for (const point2 of points) {
-            const slope: number = (point2.y - end.y) / (point2.x - end.x);
-            if (slope > maxRightSlope) {
-                maxRightSlope = slope;
-            }
-        }
-        return maxRightSlope;
-    }
-
-    /**
      * This method calculates the two Control Points for the Slur Curve.
      * @param endX
      * @param leftAngle
@@ -678,29 +773,53 @@ export class GraphicalSlur extends GraphicalCurve {
         return {leftControlPoint: leftCp, rightControlPoint: rightCp};
     }
 
-    /**
-     * This method reads the current minAngle and maxAngle and calculates the actual Angles for the Curve's Control Points.
-     * @param leftAngle
-     * @param rightAngle
-     * @param leftLineSlope
-     * @param rightLineSlope
-     * @param maxAngle
-     */
-    private calculateAngles(
-        leftAngle: number, rightAngle: number, leftLineSlope: number,
-        rightLineSlope: number, maxAngle: number,
-    ): void {
-        // original version with calculated angles:
-        const calculatedLeftAngle: number = Math.atan(leftLineSlope) * 180 / Math.PI * 0.75;
-        const calculatedRightAngle: number = Math.atan(rightLineSlope) * 180 / Math.PI * 0.75;
-
-        leftAngle = Math.min(Math.max(leftAngle, calculatedLeftAngle), maxAngle);
-        rightAngle = Math.max(Math.min(rightAngle, calculatedRightAngle), -maxAngle);
-    }
-
     private static degreesToRadiansFactor: number = Math.PI / 180;
-    private static k: number = 0.9;
-    private static d: number = 0.2;
+
+    // ── Slur control screws (Stellschrauben) ────────────────────────────────
+    // Each is a named lever with a documented measured effect (screw→effect
+    // study, 4-score corpus). Defaults are the tuned baseline. Tests/sweeps
+    // override these statics to measure one screw at a time.
+    /** S5: bow slope amplitude — horizontal reach of control points (k>0,
+     *  higher = fatter curve near endpoints). Range 0.5–1.3.
+     *  Measured: weak — collisions/balloons unchanged; k>0.9 raises
+     *  leakOverlaps (28→32 at k=1.3) and mean bow ratio. */
+    public static k: number = 0.9;
+    /** S6: bow slope damping — vertical influence of endpoint tangents.
+     *  Range 0.05–0.4.
+     *  Measured: weak — higher d improves mean clearance (-59→-53.6 px at
+     *  d=0.4) but raises leakOverlaps (26→34) and fattens bows. */
+    public static d: number = 0.2;
+    /** S1: clearable t-window — obstacles outside [minT,maxT] are ignored.
+     *  Wider = bows over more near-endpoint obstacles (taller); narrower =
+     *  flatter but may graze.
+     *  Measured: the only strong screw. Narrowing [0.25,0.75]→[0.32,0.68]
+     *  cuts balloons 64→55 and mean bow ratio 0.385→0.261 with real
+     *  collisions (all-obstacle oracle) unchanged ~48; but mean clearance
+     *  worsens (-57→-67 px) as near-end obstacles are ignored. Balanced
+     *  optimum: [0.32,0.68] (cost 108 vs 126 baseline). */
+    public static clearableMinT: number = SLUR_CLEARABLE_MIN_T;
+    public static clearableMaxT: number = SLUR_CLEARABLE_MAX_T;
+    /** S2: max vertical obstacle distance (non-cross slurs; cross-staff uses
+     *  Infinity). Tighter cap = fewer far-above obstacles = flatter.
+     *  Measured: no effect on corpus (non-cross-only; corpus dominated by
+     *  cross-staff slurs). */
+    public static injectMaxDistNonCross: number = 8;
+    /** S3: obstacle clearance margin — extra space above a notehead top
+     *  before it counts as an obstacle.
+     *  Measured: no effect on corpus (0–3.0 identical; no injected obstacle
+     *  sits within the margin band). */
+    public static injectClearanceMargin: number = 0.8;
+    /** Master switch: unified pixel-frame solver (true) vs legacy skyline algo
+     *  (false). Kept for A/B measurement via the sweep harness. */
+    public static useUnifiedSolver: boolean = true;
+    /** Anti-balloon slack (OSMD units): the solver's CP perpendicular height may
+     *  exceed the tallest in-window obstacle by at most (margin + slack). Bounds
+     *  cross-staff bows to the obstacle band instead of the amplified clearance
+     *  requirement. */
+    public static antiBalloonSlack: number = 1.5;
+    /** Absolute bow ceiling as a fraction of chord length; trims natural-bow
+     *  excess on long slurs (only above the clearance requirement). */
+    public static maxBowRatio: number = 0.5;
 
     // ── Stubs for VexFlowMusicSheetDrawer ──────────────────────────────────────
 

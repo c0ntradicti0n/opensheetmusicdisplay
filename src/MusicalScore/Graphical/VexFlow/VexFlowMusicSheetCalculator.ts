@@ -2565,7 +2565,15 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
             if (gSlur.slur.isCrossed()) {
                 continue;
             }
-            gSlur.calculateCurve(this.rules);
+            // Layout time: only reserve the natural-bow skyline envelope so later
+            // passes (measure numbers, ornaments, dynamics, lyrics) clear the slur.
+            // The final obstacle-aware curve is solved at draw time (drawSlurs),
+            // where real VF notehead/stem pixel geometry is available.
+            if (GraphicalSlur.useUnifiedSolver) {
+                gSlur.reserveSkyline(this.rules);
+            } else {
+                gSlur.calculateCurve(this.rules);
+            }
         }
       }
     }

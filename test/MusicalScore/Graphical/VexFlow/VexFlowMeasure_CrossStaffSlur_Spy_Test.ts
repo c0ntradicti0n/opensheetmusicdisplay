@@ -8,6 +8,7 @@ import { TestUtils } from "../../../Util/TestUtils";
 import { VexFlowMeasure } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowMeasure";
 import { VexFlowStaffLine } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowStaffLine";
 import { GraphicalSlur } from "../../../../src/MusicalScore/Graphical/GraphicalSlur";
+import { renderToSvg } from "../../../Util/SlurQualityReporter";
 
 function loadScore(path: string): { gms: GraphicalMusicSheet, calc: VexFlowMusicSheetCalculator } {
     const score: Document = TestUtils.getScore(path);
@@ -45,16 +46,6 @@ function prepareMeasures(gms: GraphicalMusicSheet): void {
     }
 }
 
-/** Run draw-time adjustments on a graphical slur to get final CPs. */
-function applyDrawTimeAdjustments(slur: GraphicalSlur, rules: any): void {
-    if (slur.slur.isCrossed()) {
-        slur.calculateCurveCrossStaff(rules);
-    } else {
-        slur.clampToVoiceSkyline(rules);
-        slur.adjustForVisualCrossStaff(rules);
-    }
-}
-
 interface SlurCpInfo {
     slur: GraphicalSlur;
     measure: number;
@@ -88,12 +79,27 @@ function collectCrossStaffSlurs(gms: GraphicalMusicSheet, calc: VexFlowMusicShee
                     // Skip slurs that are neither source-crossed nor visual-cross-staff
                     if (!slur.slur.isCrossed() && !visCross) { continue; }
 
-                    applyDrawTimeAdjustments(slur, calc.rules);
+                    // Curves are already final after renderToSvg (draw-time solve).
+                    // Re-running the solver here would double-mutate the skyline.
 
                     const sy: number = slur.bezierStartPt.y;
                     const ey: number = slur.bezierEndPt.y;
-                    const chordTop: number = Math.min(sy, ey);
-                    const bow: number = chordTop - slur.bezierStartControlPt.y;
+                    // Bow = perpendicular distance of the control point from the
+                    // chord LINE (not from the far endpoint). For a steep
+                    // cross-staff chord, cp1 sits below the high (treble) endpoint
+                    // even for a perfect arc, so chordTop-cp1.y under-reports the
+                    // real bow. Positive = the CP bulges to the slur (Above) side.
+                    const sx: number = slur.bezierStartPt.x;
+                    const ex: number = slur.bezierEndPt.x;
+                    const cdx: number = ex - sx;
+                    const cdy: number = ey - sy;
+                    const clen: number = Math.hypot(cdx, cdy) || 1;
+                    const rcx: number = slur.bezierStartControlPt.x - sx;
+                    const rcy: number = slur.bezierStartControlPt.y - sy;
+                    // Perp component of the CP off the chord line; positive on the
+                    // slur (Above) side (verified: normal (dy/L,-dx/L) yields +perp
+                    // for an above-bulging CP).
+                    const bow: number = rcx * (cdy / clen) + rcy * (-cdx / clen);
 
                     const firstSE: any = slur.staffEntries?.[0];
                     const meas: any = firstSE?.parentMeasure;
@@ -127,6 +133,10 @@ describe("Cross-Staff Slur Spy Tests", () => {
         beforeAll(() => {
             const { gms, calc } = loadScore("Dichterliebe01.xml");
             prepareMeasures(gms);
+            // Draw once so VF notes are formatted — the unified slur solver reads
+            // real notehead/stem pixel geometry at draw time (obstacles are empty
+            // until the notes are laid out by VexFlow).
+            renderToSvg(gms, calc.rules);
             slurs = collectCrossStaffSlurs(gms, calc);
         });
 
