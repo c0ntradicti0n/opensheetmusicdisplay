@@ -164,7 +164,11 @@ export class GraphicalSlur extends GraphicalCurve {
             // staff / another system) don't balloon the slur.
             const injMaxDist: number = isCrossStaffInj ? Infinity : 8; // 2 staff heights
             const musicSysInj: any = staffLine.ParentMusicSystem;
-            const injStaffLines: StaffLine[] = musicSysInj
+            // Non-cross slurs stay on one staff: inject from the local staff only.
+            // Sibling-staff noteheads live in a different Y band (shifted by the full
+            // staff gap), so treating them as obstacles inflates clearance and balloons
+            // the slur. Only cross-staff slurs clear obstacles from sibling staves.
+            const injStaffLines: StaffLine[] = (isCrossStaffInj && musicSysInj)
                 ? musicSysInj.StaffLines : [staffLine];
             const currentStaffRelY: number = staffLine.PositionAndShape.RelativePosition.y;
             for (const injSl of injStaffLines) {
@@ -192,7 +196,7 @@ export class GraphicalSlur extends GraphicalCurve {
                             // can't be cleared by bowing (bezier is nearly flat there), so
                             // don't inject/mark them as relevant obstacles.
                             const injT: number = (noteX2 - startX) / (endX - startX);
-                            if (injT < 0.15 || injT > 0.85) { continue; }
+                            if (injT < 0.25 || injT > 0.75) { continue; }
                             // Use OSMD model Y, converted to the current staff's space via
                             // the final computed staff gap (matches rendered SVG).
                             const gveRelY2: number = gve2.PositionAndShape?.RelativePosition?.y ?? 0;
@@ -255,8 +259,8 @@ export class GraphicalSlur extends GraphicalCurve {
         const chordDx: number = endX - startX;
         const chordDy: number = endY - startY;
         const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
-        const minT: number = 0.15;
-        const maxT: number = 0.85;
+        const minT: number = 0.25;
+        const maxT: number = 0.75;
         if (isAbove) {
             const startI: number = this.slur?.isCrossed() ? localPointCount : 0;
             for (let i: number = startI; i < points.length; i++) {

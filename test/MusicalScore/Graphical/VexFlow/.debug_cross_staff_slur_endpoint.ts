@@ -474,7 +474,7 @@ function bezierCollidesWithObstacles(
         const chordDy: number = ey - sy;
         const chordLenSq: number = chordDx * chordDx + chordDy * chordDy;
         const tObs: number = ((obs.x - sx) * chordDx + (obs.y - sy) * chordDy) / chordLenSq;
-        if (tObs < 0.15 || tObs > 0.85) { continue; }
+        if (tObs < 0.25 || tObs > 0.75) { continue; }
         let bestIdx: number = -1;
         let bestDist: number = Infinity;
         for (let i: number = 0; i <= N; i++) {
@@ -534,6 +534,18 @@ function addSvgObstacles(svg: SVGSVGElement, slurs: SlurInfo[]): void {
         arr.push({ x: cx, y: parseFloat(ty) });
         nhMap.set(xmlId, arr);
     }
+    /** Nearest stave range to a given Y (returns stave index, or -1 if none). */
+    const nearestStave = (y: number): number => {
+        let bestIdx: number = -1;
+        let bestDist: number = Infinity;
+        for (let si: number = 0; si < staveRanges.length; si++) {
+            const sr: { top: number; bot: number } = staveRanges[si];
+            const near: number = y < sr.top ? sr.top : (y > sr.bot ? sr.bot : y);
+            const dist: number = Math.abs(y - near);
+            if (dist < bestDist) { bestDist = dist; bestIdx = si; }
+        }
+        return bestIdx;
+    };
     for (const s of slurs) {
         s.obstacleSvgPoints = s.obstacleSvgPoints.filter(op => op.cat === "skyline");
         const minSvgX: number = Math.min(s.svgStart.x, s.svgEnd.x);
@@ -543,8 +555,10 @@ function addSvgObstacles(svg: SVGSVGElement, slurs: SlurInfo[]): void {
         // For non-cross slurs: find which stave the chord belongs to via start Y,
         // then only include noteheads from that stave (exclude sibling staff).
         // For cross-staff slurs: include all noteheads.
-        let yMin: number = -Infinity;
-        let yMax: number = Infinity;
+        // Match each candidate notehead to its own nearest stave, and require the
+        // same stave index as the slur's chord — ledger-line noteheads still land
+        // on their own staff, while noteheads a system away map to a different stave.
+        let chordStaveIdx: number = -1;
         if (!s.isCrossed) {
             // VF5: g.vf-stavenote is a SIBLING of g.vf-stave (both under g.vf-measure),
             // so closest("g.vf-stave") fails. Instead match the start note's own
@@ -552,26 +566,14 @@ function addSvgObstacles(svg: SVGSVGElement, slurs: SlurInfo[]): void {
             const startTextEl: Element | null = svg.querySelector(`[data-note-id="${s.id}"] text`);
             const startYAttr: string | null = startTextEl?.getAttribute("y") ?? null;
             const startNoteY: number = startYAttr ? parseFloat(startYAttr) : chordMidY;
-            const ledgerTolerance: number = 120;
-            let bestTop: number = -Infinity;
-            let bestBot: number = Infinity;
-            let bestDist: number = Infinity;
-            for (const sr of staveRanges) {
-                const near: number = startNoteY < sr.top ? sr.top : (startNoteY > sr.bot ? sr.bot : startNoteY);
-                const dist: number = Math.abs(startNoteY - near);
-                if (dist < bestDist) { bestDist = dist; bestTop = sr.top; bestBot = sr.bot; }
-            }
-            if (bestDist < Infinity) {
-                yMin = bestTop - ledgerTolerance;
-                yMax = bestBot + ledgerTolerance;
-            }
+            chordStaveIdx = nearestStave(startNoteY);
         }
         for (const [xmlId, positions] of nhMap) {
             if (xmlId === s.id) { continue; }
             for (const pos of positions) {
                 if (pos.x < minSvgX || pos.x > maxSvgX) { continue; }
                 if ((aboveSlur && pos.y >= chordMidY) || (!aboveSlur && pos.y <= chordMidY)) { continue; }
-                if (pos.y < yMin || pos.y > yMax) { continue; }
+                if (chordStaveIdx >= 0 && nearestStave(pos.y) !== chordStaveIdx) { continue; }
                 s.obstacleSvgPoints.push({ x: pos.x, y: pos.y, cat: "injected" });
             }
         }
