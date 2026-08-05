@@ -926,7 +926,9 @@ describe("Debug slur obstacles", () => {
                     const cs: SlurInfo[] = slurs.filter(s => s.isCrossed || s.spanX > 15);
                     const failures: string[] = [];
                     for (const s of cs) {
-                        if (s.cpY_osmd < 0.5) {
+                        // A system-break split continuation can be a few px long (end
+                        // note on the first beat of the next system) — too short to bow.
+                        if (s.cpY_osmd < 0.5 && Math.abs(s.spanX) > 2) {
                             failures.push(`${s.id} cpY=${s.cpY_osmd.toFixed(2)}`);
                         }
                     }

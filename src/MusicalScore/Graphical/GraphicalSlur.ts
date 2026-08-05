@@ -22,6 +22,10 @@ import { collectSlurObstacles, collectSlurObstaclesStaffRelative, CollectContext
 export class GraphicalSlur extends GraphicalCurve {
     public slur: Slur;
     public staffEntries: GraphicalStaffEntry[] = [];
+    /** Staffline this slur's curve is drawn on. For system-break continuations the
+     *  accumulated staffEntries start on a sibling staff (processed first), so the
+     *  coordinate frame must come from the added staffline, not staffEntries[0]. */
+    public anchorStaffLine?: StaffLine;
     public placement: PlacementEnum;
     public graceStart: boolean;
     public graceEnd: boolean;
@@ -92,7 +96,7 @@ export class GraphicalSlur extends GraphicalCurve {
         if (end === undefined && this.graceEnd) {
             end = endStaffEntry.findGraphicalNoteFromGraceNote(this.slur.EndNote);
         }
-        return {start, end, staffLine: startStaffEntry.parentMeasure.ParentStaffLine};
+        return {start, end, staffLine: this.anchorStaffLine ?? startStaffEntry.parentMeasure.ParentStaffLine};
     }
 
     /**
@@ -181,11 +185,14 @@ export class GraphicalSlur extends GraphicalCurve {
         if (startVf) { excludeNotes.add(startVf); }
         if (endVf) { excludeNotes.add(endVf); }
 
+        const endGN: GraphicalNote = rules.GNote(this.slur.EndNote);
+        const endSL: StaffLine | undefined = endGN?.parentVoiceEntry?.parentStaffEntry?.parentMeasure?.ParentStaffLine;
         const ctx: CollectContext = {
             staffLine, startXPx, endXPx, startYPx, endYPx,
             above: isAbove,
             excludeNotes,
             minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
+            crossSystemFirstHalf: !!(endSL && endSL.ParentMusicSystem !== staffLine.ParentMusicSystem),
         };
         const obstacles: SlurObstacle[] = collectSlurObstacles(ctx);
 
@@ -562,6 +569,18 @@ export class GraphicalSlur extends GraphicalCurve {
      * @param rules
      * @param skyBottomLineCalculator
      */
+    /** Last staff entry on the given staff line — the system-break point. Cross-staff
+     *  slurs mix entries of both staves, so scan backwards for the entry that belongs
+     *  to THIS staff line (no sibling-staff Y offset applies at the break). */
+    private lastStaffEntryOnStaffLine(staffLine: StaffLine): GraphicalStaffEntry | undefined {
+        for (let ei: number = this.staffEntries.length - 1; ei >= 0; ei--) {
+            if (this.staffEntries[ei].parentMeasure.ParentStaffLine === staffLine) {
+                return this.staffEntries[ei];
+            }
+        }
+        return undefined;
+    }
+
     private calculateStartAndEnd(   slurStartNote: GraphicalNote,
                                     slurEndNote: GraphicalNote,
                                     staffLine: StaffLine,
@@ -571,6 +590,9 @@ export class GraphicalSlur extends GraphicalCurve {
         let startY: number = 0;
         let endX: number = 0;
         let endY: number = 0;
+        // True when endY came from the system-break point (last entry on this staff);
+        // the "end at start height" fallback below must not override it.
+        let breakPointYSet: boolean = false;
 
         if (slurStartNote !== undefined) {
             // must be relative to StaffLine
@@ -608,7 +630,7 @@ export class GraphicalSlur extends GraphicalCurve {
             startX = staffLine.Measures[0].beginInstructionsWidth;
         }
 
-        if (slurEndNote !== undefined) {
+        if (!(this.slur && this.slur.isCrossed()) && slurEndNote !== undefined) {
             endX = slurEndNote.PositionAndShape.RelativePosition.x + slurEndNote.parentVoiceEntry.parentStaffEntry.PositionAndShape.RelativePosition.x
                 + slurEndNote.parentVoiceEntry.parentStaffEntry.parentMeasure.PositionAndShape.RelativePosition.x;
 
@@ -624,34 +646,76 @@ export class GraphicalSlur extends GraphicalCurve {
                 endY = slurEndVE.PositionAndShape.RelativePosition.y + slurEndVE.PositionAndShape.BorderBottom;
             }
         } else if (this.slur && this.slur.isCrossed()) {
-            // Cross-staff: end note on different staff — use VF5 stave position.
+            // Cross-staff: end note on a different staff. If it is also in a different
+            // SYSTEM, this is the first half of a system-break split — the curve stops
+            // at the system break (this staff's last staff entry), not at the far end
+            // note (whose frame belongs to the next system).
             const endGN: GraphicalNote = rules.GNote(this.slur.EndNote);
-            const vfNt: VF.StaveNote = (endGN as VexFlowGraphicalNote)?.vfnote?.[0] as VF.StaveNote;
-            const vfSt: VF.Stave | undefined = vfNt?.getStave?.();
-            if (vfNt && vfSt) {
-                const endMeasure: GraphicalMeasure = endGN?.parentVoiceEntry?.parentStaffEntry?.parentMeasure;
-                const endMeasRelX: number = endMeasure?.PositionAndShape?.RelativePosition?.x ?? 0;
-                const staveOriginPx: number = vfSt.getX() - endMeasRelX * unitInPixels;
-                const noteCenterPx: number = vfNt.getAbsoluteX() + vfNt.getGlyphWidth() / 2;
-                endX = (noteCenterPx - staveOriginPx) / unitInPixels;
-                const kps: any[] = vfNt.getKeyProps?.() ?? [];
-                const topLine: number = kps.length > 0 ? Math.max(...kps.map((kp: any) => kp.line)) : 2;
-                endY = 5 - topLine;
-                // SlurNoteHeadYOffset applied in calculateCurve — not here.
+            const endStaffLine: StaffLine = endGN?.parentVoiceEntry?.parentStaffEntry?.parentMeasure?.ParentStaffLine;
+            if (endStaffLine && endStaffLine.ParentMusicSystem !== staffLine.ParentMusicSystem) {
+                const breakEntry: GraphicalStaffEntry | undefined = this.lastStaffEntryOnStaffLine(staffLine);
+                // A slur starting on the LAST note of the system has no entry after it
+                // to serve as the break point — fall back to the system edge.
+                if (breakEntry && breakEntry !== this.staffEntries[0]) {
+                    endX = breakEntry.PositionAndShape.RelativePosition.x
+                        + breakEntry.parentMeasure.PositionAndShape.RelativePosition.x;
+                    // Same-staff continuation: the first half ends at the slur's own
+                    // height (startY), not at the last note's height. The last note of
+                    // the system can be far below/above the slur start (e.g. a low
+                    // bass note), which would tilt the whole chord and tip the arc.
+                    endY = startY;
+                    breakPointYSet = true;
+                } else {
+                    endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
+                }
+            } else {
+                // Same-system cross-staff: end note is on the sibling staff — use VF5 stave position.
+                const vfNt: VF.StaveNote = (endGN as VexFlowGraphicalNote)?.vfnote?.[0] as VF.StaveNote;
+                const vfSt: VF.Stave | undefined = vfNt?.getStave?.();
+                if (vfNt && vfSt) {
+                    const endMeasure: GraphicalMeasure = endGN?.parentVoiceEntry?.parentStaffEntry?.parentMeasure;
+                    const endMeasRelX: number = endMeasure?.PositionAndShape?.RelativePosition?.x ?? 0;
+                    const staveOriginPx: number = vfSt.getX() - endMeasRelX * unitInPixels;
+                    const noteCenterPx: number = vfNt.getAbsoluteX() + vfNt.getGlyphWidth() / 2;
+                    endX = (noteCenterPx - staveOriginPx) / unitInPixels;
+                    const kps: any[] = vfNt.getKeyProps?.() ?? [];
+                    const topLine: number = kps.length > 0 ? Math.max(...kps.map((kp: any) => kp.line)) : 2;
+                    endY = 5 - topLine;
+                    // SlurNoteHeadYOffset applied in calculateCurve — not here.
 
-                // Account for Y offset between start and end staves (cross-staff).
-                // Use OSMD model abs Y (VF5 stave Y not yet set at draw time).
-                const endStaffLine: StaffLine = endGN?.parentVoiceEntry?.parentStaffEntry?.parentMeasure?.ParentStaffLine;
-                if (endStaffLine && endStaffLine !== staffLine) {
-                    const yOffset: number = endStaffLine.PositionAndShape.AbsolutePosition.y
-                        - staffLine.PositionAndShape.AbsolutePosition.y;
-                    endY += yOffset;
+                    // Account for Y offset between start and end staves (cross-staff).
+                    // Use OSMD model abs Y (VF5 stave Y not yet set at draw time).
+                    if (endStaffLine && endStaffLine !== staffLine) {
+                        const yOffset: number = endStaffLine.PositionAndShape.AbsolutePosition.y
+                            - staffLine.PositionAndShape.AbsolutePosition.y;
+                        endY += yOffset;
+                    }
+                } else {
+                    endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
+                }
+            }
+        } else {
+            // Same-staff slur whose end note is not in this staffline's entries — it
+            // may be in a different SYSTEM. Then this is the first half of a system-break
+            // split: stop at the system break on this staff (last entry), not at the far
+            // end note's frame. Otherwise fall back to the system edge.
+            const endGN2: GraphicalNote = rules.GNote(this.slur.EndNote);
+            const endSL2: StaffLine = endGN2?.parentVoiceEntry?.parentStaffEntry?.parentMeasure?.ParentStaffLine;
+            if (endSL2 && endSL2.ParentMusicSystem !== staffLine.ParentMusicSystem) {
+                const breakEntry: GraphicalStaffEntry | undefined = this.lastStaffEntryOnStaffLine(staffLine);
+                if (breakEntry && breakEntry !== this.staffEntries[0]) {
+                    endX = breakEntry.PositionAndShape.RelativePosition.x
+                        + breakEntry.parentMeasure.PositionAndShape.RelativePosition.x;
+                    // Same-staff continuation: end the first half at the slur's own
+                    // height, not at the last note's height (which can tilt the chord).
+                    endY = startY;
+                    breakPointYSet = true;
+                } else {
+                    endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
                 }
             } else {
                 endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
             }
-        } else {
-            endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
         }
 
         // if GraphicalSlur breaks over System, then the end/start of the curve is at the corresponding height with the known start/end
@@ -662,7 +726,7 @@ export class GraphicalSlur extends GraphicalCurve {
         if (slurStartNote === undefined) {
             startY = endY;
         }
-        if (slurEndNote === undefined && !(this.slur?.isCrossed())) {
+        if (slurEndNote === undefined && !(this.slur?.isCrossed()) && !breakPointYSet) {
             endY = startY;
         }
 

@@ -33,6 +33,11 @@ export interface CollectContext {
     excludeNotes: Set<VF.StemmableNote>;
     minT: number;
     maxT: number;
+    /** Cross-system first half: the end note is in the NEXT system, so this curve
+     *  stops at the system break on its own staff. It must not clear sibling-staff
+     *  notes in the source system — those sit a full staff-gap above the chord and
+     *  balloon the arc (the slur reaches the sibling staff only in the next system). */
+    crossSystemFirstHalf?: boolean;
 }
 
 /** Chord-projection t of an X/Y against the chord (same as the solver's gate). */
@@ -48,7 +53,8 @@ function noteObstaclesTrusted(
     vfNote: VF.StemmableNote, ctx: CollectContext, out: SlurObstacle[],
 ): void {
     const anyNote: any = vfNote as any;
-    if (!anyNote.getNoteHeadBounds) { return; } // rest / ghost note
+    if (vfNote.isRest?.()) { return; } // rests don't need slur clearance
+    if (!anyNote.getNoteHeadBounds) { return; } // ghost note
     const bounds: { yTop: number, yBottom: number } = anyNote.getNoteHeadBounds();
     const cx: number = vfNote.getAbsoluteX() + vfNote.getGlyphWidth() / 2;
     if (cx < Math.min(ctx.startXPx, ctx.endXPx) || cx > Math.max(ctx.startXPx, ctx.endXPx)) { return; }
@@ -128,7 +134,8 @@ export function collectSlurObstaclesStaffRelative(ctx: CollectContext): SlurObst
                 if (!vf) { continue; }
                 if (ctx.excludeNotes.has(vf)) { continue; }
                 const anyNote: any = vf as any;
-                if (!anyNote.getNoteHeadBounds) { continue; } // rest / ghost note
+                if (vf.isRest?.()) { continue; } // rests don't need slur clearance
+                if (!anyNote.getNoteHeadBounds) { continue; } // ghost note
                 const stave: any = vf.getStave?.();
                 if (!stave) { continue; }
                 const bounds: { yTop: number, yBottom: number } = anyNote.getNoteHeadBounds();
@@ -196,6 +203,7 @@ export function collectSlurObstacles(ctx: CollectContext): SlurObstacle[] {
     };
 
     const myAbsY: number = ctx.staffLine.PositionAndShape.AbsolutePosition.y;
+    if (ctx.crossSystemFirstHalf) { return out; } // first half stays on its own staff
     for (const sib of siblingStaffLines(ctx.staffLine)) {
         const sibAbsY: number = sib.PositionAndShape.AbsolutePosition.y;
         const sibAbove: boolean = sibAbsY < myAbsY;
