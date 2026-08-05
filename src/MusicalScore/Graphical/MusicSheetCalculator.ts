@@ -1084,6 +1084,14 @@ export abstract class MusicSheetCalculator {
         //  allowing rehearsal marks to check for overlap and adjust yOffset accordingly)
         this.calculateRehearsalMarks();
 
+        // Re-run Y-spacing with all element skyline extents included (pedals,
+        // dynamics, ornaments, octave shifts, ...), so inter-staff / inter-system
+        // gaps reserve room for every element that extends into them — not just
+        // notes, slurs and lyrics. Reset the pages created by the first pass and
+        // recompute the final positions.
+        this.graphicalMusicSheet.MusicPages = [];
+        musicSystemBuilder.calculateSystemYLayout();
+
         // calculate Comments for each Staffline
         this.calculateComments();
         // calculate marked Areas for Systems
