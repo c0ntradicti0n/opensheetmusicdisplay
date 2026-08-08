@@ -11,6 +11,7 @@ export default defineConfig(
         ignores: ["webpack*.js",
             "**/*.d.ts",
             "*_min.ts",
+            "test/**/.debug_*",
             ".claude/",
             ".husky/",
             ".karma_temp/",
@@ -47,7 +48,9 @@ export default defineConfig(
             },
             parserOptions: {
                 projectService: {
-                    allowDefaultProject: ["vitest.config.ts", "vitest.browser.config.ts"],
+                    allowDefaultProject: ["vitest.config.ts", "vitest.browser.config.ts", "vitest.browser.debug.config.ts",
+                        "test/MusicalScore/Graphical/VexFlow/.scan_optimum.ts",
+                        "test/MusicalScore/Graphical/VexFlow/.sweep_slur_screws.ts"],
                 },
                 tsconfigRootDir: import.meta.dirname, // needs node v20+, but eslint >=9 needs it anyways
             },

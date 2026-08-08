@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { registerFont } from "canvas";
 
 // Replicate karma-xml2js-preprocessor + karma-base64-to-js-preprocessor:
 // Populate globalThis.__xml__ and globalThis.__raw__ so TestUtils works unchanged.
@@ -32,66 +33,41 @@ for (const file of mxlFiles) {
 (globalThis as any).__xml__ = xmlMap;
 (globalThis as any).__raw__ = rawMap;
 
-// Mock FontFace.load for environments without real font rendering (node, jsdom)
-if (typeof FontFace !== "undefined") {
-  FontFace.prototype.load = function (): Promise<any> {
-    return Promise.resolve(this);
-  };
+// Register SMuFL fonts so VF5's measureText() returns real glyph widths.
+// node-canvas (canvas npm pkg) is required — must exist in node_modules.
+// generateImages_browserless.cjs uses the same approach.
+const VEXFLOW_FONTS_DIR: string = path.resolve(__dirname, "../external/vexflow/node_modules/@vexflow-fonts");
+const FONT_OTFS: [string, string][] = [
+  ["bravura/bravura.otf", "Bravura"],
+  ["gonville/gonville.otf", "Gonville"],
+  ["petaluma/petaluma.otf", "Petaluma"],
+  ["petalumascript/petalumascript.otf", "Petaluma Script"],
+  ["academico/academico.otf", "Academico"],
+  ["academico/academico-bold.otf", "Academico"],
+];
+for (const [relPath, family] of FONT_OTFS) {
+  const fullPath: string = path.join(VEXFLOW_FONTS_DIR, relPath);
+  if (fs.existsSync(fullPath)) {
+    registerFont(fullPath, { family });
+  }
 }
+// Preload woff2 font data for SVG annotation in debug tests.
+// Stored in globalThis so debug tests can inject @font-face regardless
+// of JSDOM/browser mode (without requiring fs at annotation time).
+const FONT_WOFF2: [string, string][] = [
+  ["Bravura", "bravura/bravura.woff2"],
+  ["Gonville", "gonville/gonville.woff2"],
+];
+const fontData: Record<string, string> = {};
+for (const [family, relPath] of FONT_WOFF2) {
+  const fullPath: string = path.join(VEXFLOW_FONTS_DIR, relPath);
+  if (fs.existsSync(fullPath)) {
+    fontData[family] = fs.readFileSync(fullPath).toString("base64");
+  }
+}
+(globalThis as any).__fontData__ = fontData;
 
-// Mock HTMLCanvasElement.getContext for jsdom (no real canvas package).
-// VexFlow creates canvas 2d contexts to measure text.
-// Skip jsdom's native getContext entirely — without the optional `canvas` binary
-// it logs "Not implemented" and returns null; our mock handles everything instead.
-/* eslint-disable @typescript-eslint/no-empty-function */
-if (typeof HTMLCanvasElement !== "undefined") {
-  HTMLCanvasElement.prototype.getContext = function (...args: any[]): any {
-    const type: string = args[0] as string;
-    if (type === "2d" || type === "2d-default") {
-      const mockCtx: Record<string, any> = {};
-      mockCtx.canvas = this;
-      mockCtx.font = "10px sans-serif";
-      mockCtx.textAlign = "start";
-      mockCtx.textBaseline = "alphabetic";
-      mockCtx.direction = "ltr";
-      mockCtx.measureText = (text: string): TextMetrics => ({
-        width: text.length * 6,
-        actualBoundingBoxAscent: 8,
-        actualBoundingBoxDescent: 2,
-        fontBoundingBoxAscent: 8,
-        fontBoundingBoxDescent: 2,
-        alphabeticBaseline: 0,
-      } as TextMetrics);
-      mockCtx.clearRect = (): void => {};
-      mockCtx.fillRect = (): void => {};
-      mockCtx.strokeRect = (): void => {};
-      mockCtx.fillText = (): void => {};
-      mockCtx.strokeText = (): void => {};
-      mockCtx.save = (): void => {};
-      mockCtx.restore = (): void => {};
-      mockCtx.beginPath = (): void => {};
-      mockCtx.closePath = (): void => {};
-      mockCtx.moveTo = (): void => {};
-      mockCtx.lineTo = (): void => {};
-      mockCtx.arc = (): void => {};
-      mockCtx.bezierCurveTo = (): void => {};
-      mockCtx.quadraticCurveTo = (): void => {};
-      mockCtx.fill = (): void => {};
-      mockCtx.stroke = (): void => {};
-      mockCtx.clip = (): void => {};
-      mockCtx.scale = (): void => {};
-      mockCtx.rotate = (): void => {};
-      mockCtx.translate = (): void => {};
-      mockCtx.transform = (): void => {};
-      mockCtx.setTransform = (): void => {};
-      mockCtx.createLinearGradient = (): any => ({ addColorStop: (): void => {} });
-      mockCtx.createRadialGradient = (): any => ({ addColorStop: (): void => {} });
-      mockCtx.createPattern = (): any => null;
-      Object.defineProperty(mockCtx, "width", { get: (): number => 300 });
-      Object.defineProperty(mockCtx, "height", { get: (): number => 150 });
-      return mockCtx as any;
-    }
-    return null;
-  };
-}
-/* eslint-enable @typescript-eslint/no-empty-function */
+// No more fake getContext mock — VF5 uses document.createElement('canvas')
+// which jsdom 29+ backs with node-canvas automatically when the `canvas`
+// package is installed. If this fails (missing Cairo libs etc.), the first
+// test calling measureText throws — no silent fallback.

@@ -7,6 +7,7 @@ const XML_FILES: string[] = [
   "OSMD_function_test_GraceNotes.xml",
   "Debussy_Mandoline.xml",
   "Dichterliebe01.xml",
+  "Beethoven_AnDieFerneGeliebte.xml",
   "JohannSebastianBach_PraeludiumInCDur_BWV846_1.xml",
 ];
 
@@ -43,3 +44,44 @@ async function loadFiles(files: string[], _ext: string): Promise<void> {
 
 await loadFiles(XML_FILES, ".xml");
 await loadFiles(MUSICXML_FILES, ".musicxml");
+
+// Load MXL files (used by debug tests that parse with JSZip)
+const MXL_FILES: string[] = [
+  ".john-field-piano-concerto-7_m318-323.mxl",
+  ".john-field-piano-concerto-7_m533-537.mxl",
+  ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl",
+];
+for (const name of MXL_FILES) {
+  const url: string = `/test/data/${name}`;
+  const resp: Response = await fetch(url);
+  if (!resp.ok) { throw new Error(`Failed to load MXL: ${url} (${resp.status})`); }
+  // MXL is binary zip — store as latin1 string matching jsdom setup encoding
+  const buf: ArrayBuffer = await resp.arrayBuffer();
+  const bytes: Uint8Array = new Uint8Array(buf);
+  let raw: string = "";
+  for (let i: number = 0; i < bytes.length; i++) {
+    raw += String.fromCharCode(bytes[i]);
+  }
+  (globalThis as any).__raw__[`test/data/${name}`] = raw;
+}
+
+// Preload woff2 font data for SVG annotation in debug tests.
+const FONT_WOFF2: [string, string][] = [
+  ["Bravura", "bravura/bravura.woff2"],
+  ["Gonville", "gonville/gonville.woff2"],
+];
+const fontData: Record<string, string> = {};
+for (const [family, relPath] of FONT_WOFF2) {
+  const url: string = `/external/vexflow/node_modules/@vexflow-fonts/${relPath}`;
+  const resp: Response = await fetch(url);
+  if (resp.ok) {
+    const buf: ArrayBuffer = await resp.arrayBuffer();
+    const bytes: Uint8Array = new Uint8Array(buf);
+    let raw: string = "";
+    for (let i: number = 0; i < bytes.length; i++) {
+      raw += String.fromCharCode(bytes[i]);
+    }
+    fontData[family] = btoa(raw);
+  }
+}
+(globalThis as any).__fontData__ = fontData;

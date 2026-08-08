@@ -2448,6 +2448,11 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
     for (const graphicalMeasure of this.graphicalMusicSheet.MeasureList[0]) { //let i: number = 0; i < this.graphicalMusicSheet.MeasureList[0].length; i++) {
       openSlursDict[graphicalMeasure.ParentStaff.idInMusicSheet] = [];
     }
+    // Cross-staff slurs end on a different staff than they start, so the per-staff
+    // open/close lists can never close them. Track them globally so they still get
+    // split at system breaks (a continuation on their own staff) and closed when the
+    // end note is reached — otherwise one huge arc spans both systems and balloons.
+    const openCrossStaffSlurs: GraphicalSlur[] = [];
 
     /* VexFlow Version - for later use
     // Generate an empty dictonary to index an array of VexFlowSlur classes
@@ -2461,6 +2466,57 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
     */
 
     for (const musicSystem of this.musicSystems) {
+        // Cross-staff open slurs resume on their own staff in the next system. Create
+        // the continuation here — at the SYSTEM level, before ANY measure processing —
+        // because the end note may sit on a sibling staff that is laid out before the
+        // start staff (e.g. staff 1 before staff 2), which would close the slur in the
+        // per-staffline open/close loop below and never produce the split half.
+        for (let csIdx: number = 0; csIdx < openCrossStaffSlurs.length; csIdx++) {
+          const csSlur: GraphicalSlur = openCrossStaffSlurs[csIdx];
+          const csStartEntry: GraphicalStaffEntry | undefined = csSlur.staffEntries[0];
+          if (!csStartEntry) { continue; }
+          // A slur that started in THIS system needs no continuation here; only
+          // slurs carried over from a previous system resume at the break.
+          if (csStartEntry.parentMeasure.ParentStaffLine.ParentMusicSystem === musicSystem) { continue; }
+          const csStartStaffId: number | undefined =
+            csSlur.anchorStaffLine?.ParentStaff?.idInMusicSheet
+            ?? csStartEntry.parentMeasure?.ParentStaff?.idInMusicSheet;
+          if (csStartStaffId === undefined) { continue; }
+          const csStaffLine: StaffLine | undefined = musicSystem.StaffLines.find(
+            (sl: StaffLine) => sl.ParentStaff.idInMusicSheet === csStartStaffId);
+          if (csStaffLine) {
+            const csContinuation: GraphicalSlur = new GraphicalSlur(csSlur.slur, this.rules);
+            csStaffLine.addSlurToStaffline(csContinuation);
+            csContinuation.staffEntries = [];
+            csContinuation.anchorStaffLine = csStaffLine;
+            openCrossStaffSlurs[csIdx] = csContinuation;
+          }
+        }
+        // Pre-create the crossed slurs that START in this system. A crossed slur's
+        // end note may sit on a sibling staff that is laid out before the start staff
+        // within the same system, so its end-note close would fire before the start
+        // note is reached. Creating it up front makes the close work regardless of
+        // staff order — and creating it only HERE (not before its own system) avoids
+        // spurious continuations at earlier systems.
+        for (const staffLine of musicSystem.StaffLines) {
+          for (const graphicalMeasure of staffLine.Measures) {
+            for (const graphicalStaffEntry of graphicalMeasure.staffEntries) {
+              for (const graphicalVoiceEntry of graphicalStaffEntry.graphicalVoiceEntries) {
+                for (const graphicalNote of graphicalVoiceEntry.notes) {
+                  for (const slur of graphicalNote.sourceNote.NoteSlurs) {
+                    if (!slur.EndNote || !slur.StartNote) { continue; }
+                    if (slur.isCrossed() && slur.StartNote === graphicalNote.sourceNote) {
+                      const gSlur: GraphicalSlur = new GraphicalSlur(slur, this.rules);
+                      staffLine.addSlurToStaffline(gSlur);
+                      gSlur.staffEntries = [graphicalStaffEntry];
+                      openCrossStaffSlurs.push(gSlur);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
         for (const staffLine of musicSystem.StaffLines) {
           // if a graphical slur reaches out of the last musicsystem, we have to create another graphical slur reaching into this musicsystem
           // (one slur needs 2 graphical slurs)
@@ -2507,19 +2563,15 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
                       //   }
                       // }
 
-                      // Add a Graphical Slur to the staffline, if the recent note is the Startnote of a slur
+                      // Add a Graphical Slur to the staffline, if the recent note is the Startnote of a slur.
+                      // Cross-staff slurs were pre-created above (before this loop) so their end-note close
+                      // works even when the sibling staff is laid out first.
+                      if (slur.isCrossed()) {
+                        continue;
+                      }
                       const gSlur: GraphicalSlur = new GraphicalSlur(slur, this.rules);
                       staffLine.addSlurToStaffline(gSlur);
-                      if (slur.isCrossed()) {
-                        // A cross-staff slur (e.g. left hand to right hand) ends on a different staff, so it
-                        // would never be closed by the per-staff open/close mechanism below - which would leave
-                        // it open and spawn phantom continuation slurs on every following staffline. Keep it out
-                        // of openGraphicalSlurs; its curve is calculated separately at draw time (spanning both
-                        // stafflines). It still needs a staffEntry for GraphicalSlur.Compare's sorting.
-                        gSlur.staffEntries = [graphicalStaffEntry];
-                      } else {
-                        openGraphicalSlurs.push(gSlur);
-                      }
+                      openGraphicalSlurs.push(gSlur);
 
                       /* VexFlow Version - for later use
                       const vfSlur: VexFlowSlur = new VexFlowSlur(slur);
@@ -2539,6 +2591,17 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
                         }
 
                         openGraphicalSlurs.splice(index, 1);
+                      }
+
+                      // Cross-staff slurs close via the global list (the end note is on
+                      // another staff, so it never matches this staff's open list).
+                      const csIndex: number = this.findIndexGraphicalSlurFromSlur(openCrossStaffSlurs, slur);
+                      if (csIndex >= 0) {
+                        const csSlur: GraphicalSlur = openCrossStaffSlurs[csIndex];
+                        if (csSlur.staffEntries.indexOf(graphicalStaffEntry) === -1) {
+                          csSlur.staffEntries.push(graphicalStaffEntry);
+                        }
+                        openCrossStaffSlurs.splice(csIndex, 1);
                       }
 
                       /* VexFlow Version - for later use
@@ -2562,6 +2625,14 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
                   gSlur.staffEntries.push(graphicalStaffEntry);
                 }
               }
+              // Cross-staff open slurs span both staves, so accumulate entries from all
+              // of them — resolveSlurNotes needs the end note's entry (on the sibling
+              // staff) as the last staffEntry.
+              for (const csSlur of openCrossStaffSlurs) {
+                if (csSlur.staffEntries.indexOf(graphicalStaffEntry) === -1) {
+                  csSlur.staffEntries.push(graphicalStaffEntry);
+                }
+              }
             } // loop over StaffEntries
           } // loop over Measures
         } // loop over StaffLines
@@ -2580,7 +2651,15 @@ export class VexFlowMusicSheetCalculator extends MusicSheetCalculator {
             if (gSlur.slur.isCrossed()) {
                 continue;
             }
-            gSlur.calculateCurve(this.rules);
+            // Layout time: only reserve the natural-bow skyline envelope so later
+            // passes (measure numbers, ornaments, dynamics, lyrics) clear the slur.
+            // The final obstacle-aware curve is solved at draw time (drawSlurs),
+            // where real VF notehead/stem pixel geometry is available.
+            if (GraphicalSlur.useUnifiedSolver) {
+                gSlur.reserveSkyline(this.rules);
+            } else {
+                gSlur.calculateCurve(this.rules);
+            }
         }
       }
     }

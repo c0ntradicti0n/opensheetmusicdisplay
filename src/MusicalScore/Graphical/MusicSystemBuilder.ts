@@ -1320,11 +1320,12 @@ export class MusicSystemBuilder {
                     const endIdx: number = Math.min(lowerSkyLine.length - 1, j + 6);
                     let skylineValue: number = 0;
                     for (let lowerIdx: number = startIdx; lowerIdx <= endIdx; lowerIdx++) {
-                        // Cap skyline: elements extending >StaffHeight above a staff
-                        // are cross-staff (beams/slurs spanning grand staff) and
-                        // must not inflate within-system spacing. Within-staff content
-                        // (ledger lines, accidentals, stems) fits in StaffHeight.
-                        const cappedSky: number = Math.max(lowerSkyLine[lowerIdx], -this.rules.StaffHeight);
+                        // Cap skyline: elements extending more than MaxSkylineAboveStaff
+                        // above a staff (cross-staff beams/slurs, tall arcs) must not
+                        // inflate within-system spacing unbounded. Slur skyline
+                        // reservations reserve up to this height (default 2×StaffHeight)
+                        // so arcs clear the staff above without ballooning the layout.
+                        const cappedSky: number = Math.max(lowerSkyLine[lowerIdx], -this.rules.MaxSkylineAboveStaff);
                         skylineValue = Math.min(skylineValue, cappedSky);
                     }
 
@@ -1540,7 +1541,7 @@ export class MusicSystemBuilder {
             const endIdx: number = Math.min(lowerSkyLineArray.length - 1, lowerCenterIdx + 6);
             let skylineValue: number = 0;
             for (let lowerIdx: number = startIdx; lowerIdx <= endIdx; lowerIdx++) {
-                const cappedSky: number = Math.max(lowerSkyLineArray[lowerIdx], -this.rules.StaffHeight);
+                const cappedSky: number = Math.max(lowerSkyLineArray[lowerIdx], -this.rules.MaxSkylineAboveStaff);
                 skylineValue = Math.min(skylineValue, cappedSky);
             }
 

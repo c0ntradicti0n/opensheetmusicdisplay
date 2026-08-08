@@ -162,7 +162,6 @@ export class SkyBottomLineCalculator {
             const vsStaff: any = measure.getVFStave();
             let width: number = vsStaff.getWidth();
             if (!(width > 0) && !measure.IsExtraGraphicalMeasure) {
-                log.warn("SkyBottomLineCalculator: width not > 0 in measure " + measure.MeasureNumber);
                 width = 50;
             }
             // Headless because we are outside the DOM
@@ -271,7 +270,6 @@ export class SkyBottomLineCalculator {
             const vsStaff: any = measure.getVFStave();
             let width: number = vsStaff.getWidth();
             if (!(width > 0) && !measure.IsExtraGraphicalMeasure) {
-                log.warn("SkyBottomLineCalculator: width not > 0 in measure " + measure.MeasureNumber);
                 width = 50;
             }
             // Mirror the raster method's "canvas.width = width" coercion (HTMLCanvasElement reflection)

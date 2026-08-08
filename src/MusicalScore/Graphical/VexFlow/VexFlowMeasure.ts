@@ -1950,20 +1950,22 @@ export class VexFlowMeasure extends GraphicalMeasure {
                 // different voices use different normal-type values in their tuplets, the calculated
                 // ticks can differ even for notes at the same timestamp. We use graphicalNoteLength
                 // (which represents the actual musical duration) to calculate correct tick values.
+                // Note: the guard was previously `sourceNote.NoteTuplet`, but OSMD may consume
+                // the tuplet during parsing while leaving NormalNotes set. Always compute from
+                // graphicalLength — it matches the VF default (note type × RESOLUTION) for
+                // non-tuplet notes (1/8 → 2048, 1/16 → 1024) and gives the correct tuplet
+                // duration (1/24 → 2048/3) for tuplet notes.
                 if (voiceEntry.notes.length > 0 && voiceEntry.notes[0].sourceNote) {
-                    const sourceNote: Note = voiceEntry.notes[0].sourceNote;
-                    if (sourceNote.NoteTuplet) {
-                        const graphicalLength: Fraction = voiceEntry.notes[0].graphicalNoteLength;
-                        // Calculate ticks using VexFlow Fraction to preserve precision.
-                        // graphicalLength.RealValue is the note length as a fraction of a whole note.
-                        // VF.Tables.RESOLUTION (e.g., 16384) is the number of ticks for a whole note.
-                        // We use Fraction arithmetic to avoid floating-point precision issues.
-                        const vfTicks: VF.Fraction = vexFlowVoiceEntry.vfStaveNote.getTicks();
-                        vfTicks.numerator = graphicalLength.Numerator * RESOLUTION;
-                        vfTicks.denominator = graphicalLength.Denominator;
-                        // Simplify the fraction to reduce large numbers
-                        vfTicks.simplify();
-                    }
+                    const graphicalLength: Fraction = voiceEntry.notes[0].graphicalNoteLength;
+                    // Calculate ticks using VexFlow Fraction to preserve precision.
+                    // graphicalLength.RealValue is the note length as a fraction of a whole note.
+                    // VF.Tables.RESOLUTION (e.g., 16384) is the number of ticks for a whole note.
+                    // We use Fraction arithmetic to avoid floating-point precision issues.
+                    const vfTicks: VF.Fraction = vexFlowVoiceEntry.vfStaveNote.getTicks();
+                    vfTicks.numerator = graphicalLength.Numerator * RESOLUTION;
+                    vfTicks.denominator = graphicalLength.Denominator;
+                    // Simplify the fraction to reduce large numbers
+                    vfTicks.simplify();
                 }
 
                 // check for in-measure clefs:

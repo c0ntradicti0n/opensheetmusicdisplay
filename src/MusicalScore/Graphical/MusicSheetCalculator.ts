@@ -995,6 +995,33 @@ export abstract class MusicSheetCalculator {
         // calculate Sky- and BottomLine
         // will have reasonable values only between ObjectsBorders (eg StaffEntries)
         this.calculateSkyBottomLines();
+
+        // Reserve slur skyline envelopes BEFORE spacing: slur objects are created
+        // and their arcs written into the staffline skyline here, so the inter-staff
+        // and inter-system spacing (calculateSystemYLayout) grows to fit them. The
+        // final obstacle-aware curve is re-solved at draw time against the rendered
+        // positions (the same-staff result is identical — the solver is
+        // staff-relative, see GraphicalSlur.reserveSkyline).
+        // update all StaffLine's Borders
+        // create temporary Object, just to call the methods (in order to avoid declaring them static)
+        for (let idx2: number = 0, len2: number = this.musicSystems.length; idx2 < len2; ++idx2) {
+            const musicSystem: MusicSystem = this.musicSystems[idx2];
+            for (let idx3: number = 0, len3: number = musicSystem.StaffLines.length; idx3 < len3; ++idx3) {
+                const staffLine: StaffLine = musicSystem.StaffLines[idx3];
+                this.updateStaffLineBorders(staffLine);
+            }
+        }
+        if (!this.leadSheet && this.rules.RenderSlurs) {
+            this.calculateSlurs();
+        }
+        // Position lyrics before spacing too: their extent goes into the staffline
+        // BottomLine, so inter-staff/inter-system spacing reserves room for lyrics
+        // as well as slur skyline envelopes (prevents lyrics colliding with a slur
+        // or content on the staff below).
+        this.calculateLyricsPosition();
+        // calculate Y-spacing -> MusicPages are created here
+        musicSystemBuilder.calculateSystemYLayout();
+
         // calculate TupletsNumbers
         this.calculateTupletNumbers();
 
@@ -1007,10 +1034,6 @@ export abstract class MusicSheetCalculator {
         }
         if (this.rules.RenderFingerings) {
             this.calculateFingerings(); // if this is done after slurs, fingerings can be on top of slurs
-        }
-        // calculate Slurs
-        if (!this.leadSheet && this.rules.RenderSlurs) {
-            this.calculateSlurs();
         }
         this.calculateGlissandi();
         //Calculate measure number skyline AFTER slurs
@@ -1061,21 +1084,14 @@ export abstract class MusicSheetCalculator {
         //  allowing rehearsal marks to check for overlap and adjust yOffset accordingly)
         this.calculateRehearsalMarks();
 
-        // calculate all LyricWords Positions
-        this.calculateLyricsPosition();
-
-        // update all StaffLine's Borders
-        // create temporary Object, just to call the methods (in order to avoid declaring them static)
-        for (let idx2: number = 0, len2: number = this.musicSystems.length; idx2 < len2; ++idx2) {
-            const musicSystem: MusicSystem = this.musicSystems[idx2];
-            for (let idx3: number = 0, len3: number = musicSystem.StaffLines.length; idx3 < len3; ++idx3) {
-                const staffLine: StaffLine = musicSystem.StaffLines[idx3];
-                this.updateStaffLineBorders(staffLine);
-            }
-        }
-
-        // calculate Y-spacing -> MusicPages are created here
+        // Re-run Y-spacing with all element skyline extents included (pedals,
+        // dynamics, ornaments, octave shifts, ...), so inter-staff / inter-system
+        // gaps reserve room for every element that extends into them — not just
+        // notes, slurs and lyrics. Reset the pages created by the first pass and
+        // recompute the final positions.
+        this.graphicalMusicSheet.MusicPages = [];
         musicSystemBuilder.calculateSystemYLayout();
+
         // calculate Comments for each Staffline
         this.calculateComments();
         // calculate marked Areas for Systems

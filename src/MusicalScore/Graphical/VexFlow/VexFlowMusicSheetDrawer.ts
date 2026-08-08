@@ -180,14 +180,19 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                     continue;
                 }
             } else {
-                // Non-cross-staff slur: clamp control points if the voice's
-                // beam is cross-staff (the curve was computed at layout time
-                // before VF beams existed, so the bezier doesn't clear
-                // treble noteheads in the cross-staff beam).
-                graphicalSlur.clampToVoiceSkyline(this.rules);
-                // Also handle visually cross-staff slurs where VF staves differ
-                // but the source model doesn't mark them as cross-staff.
-                graphicalSlur.adjustForVisualCrossStaff(this.rules);
+                // Non-cross-staff slur: solve the final obstacle-aware curve now,
+                // at draw time, when real VF notehead/stem pixel geometry exists
+                // (layout only reserved the natural-bow skyline envelope).
+                if (GraphicalSlur.useUnifiedSolver) {
+                    graphicalSlur.calculateCurve(this.rules);
+                } else {
+                    // Legacy path: clamp control points if the voice's beam is
+                    // cross-staff (curve computed at layout before VF beams existed).
+                    graphicalSlur.clampToVoiceSkyline(this.rules);
+                    // Also handle visually cross-staff slurs where VF staves differ
+                    // but the source model doesn't mark them as cross-staff.
+                    graphicalSlur.adjustForVisualCrossStaff(this.rules);
+                }
             }
             this.drawSlur(graphicalSlur, absolutePos);
         }
