@@ -130,6 +130,7 @@ export class GraphicalSlur extends GraphicalCurve {
             above: isAbove,
             excludeNotes,
             minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
+            ownVoiceId: this.slur.StartNote?.ParentVoiceEntry?.ParentVoice?.VoiceId,
         };
         const obstacles: SlurObstacle[] = collectSlurObstaclesStaffRelative(ctx);
 
@@ -192,6 +193,7 @@ export class GraphicalSlur extends GraphicalCurve {
             above: isAbove,
             excludeNotes,
             minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
+            ownVoiceId: this.slur.StartNote?.ParentVoiceEntry?.ParentVoice?.VoiceId,
             crossSystemFirstHalf: !!(endSL && endSL.ParentMusicSystem !== staffLine.ParentMusicSystem),
         };
         const obstacles: SlurObstacle[] = collectSlurObstacles(ctx);

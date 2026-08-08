@@ -19,6 +19,10 @@ export interface SlurObstacle extends SlurLiftObstacle {
     kind: "notehead" | "stem";
     /** false = Y reconstructed from the OSMD model (sibling staff not yet drawn). */
     trusted: boolean;
+    /** True when the note belongs to the slur's own voice (the melodic line the
+     *  slur connects). The arc follows the contour of these — they are in its path
+     *  by definition — and they are never filtered by the sibling-reach gate. */
+    ownVoice: boolean;
 }
 
 export interface CollectContext {
@@ -33,6 +37,11 @@ export interface CollectContext {
     excludeNotes: Set<VF.StemmableNote>;
     minT: number;
     maxT: number;
+    /** The slur's own voice id (source-model `Voice.VoiceId`). Obstacles whose note
+     *  belongs to this voice are the slur's line: they always count (arc follows the
+     *  contour) and are exempt from the sibling-reach gate. `undefined` → every
+     *  obstacle is treated as a foreign obstacle (grace notes / missing voice). */
+    ownVoiceId?: number;
     /** Cross-system first half: the end note is in the NEXT system, so this curve
      *  stops at the system break on its own staff. It must not clear sibling-staff
      *  notes in the source system — those sit a full staff-gap above the chord and
@@ -50,7 +59,7 @@ function chordT(x: number, y: number, ctx: CollectContext): number {
 
 /** Read one VF note's obstacle point (notehead top/bottom + slur-side stem tip). */
 function noteObstaclesTrusted(
-    vfNote: VF.StemmableNote, ctx: CollectContext, out: SlurObstacle[],
+    vfNote: VF.StemmableNote, ownVoice: boolean, ctx: CollectContext, out: SlurObstacle[],
 ): void {
     const anyNote: any = vfNote as any;
     if (vfNote.isRest?.()) { return; } // rests don't need slur clearance
@@ -60,7 +69,7 @@ function noteObstaclesTrusted(
     if (cx < Math.min(ctx.startXPx, ctx.endXPx) || cx > Math.max(ctx.startXPx, ctx.endXPx)) { return; }
 
     const headY: number = ctx.above ? bounds.yTop : bounds.yBottom;
-    push(cx, headY, "notehead", true, ctx, out);
+    push(cx, headY, "notehead", true, ownVoice, ctx, out);
 
     // Stem tip only when the stem points toward the slur side.
     const dir: number = vfNote.getStemDirection?.() ?? 0;
@@ -69,27 +78,34 @@ function noteObstaclesTrusted(
         // getStemExtents().topY is the stem TIP for both directions
         // (innerMostNoteheadY + stemHeight·-stemDirection).
         const ext: { topY: number, baseY: number } = anyNote.getStemExtents();
-        push(cx, ext.topY, "stem", true, ctx, out);
+        push(cx, ext.topY, "stem", true, ownVoice, ctx, out);
     }
 }
 
 function push(
     xPx: number, yPx: number, kind: "notehead" | "stem", trusted: boolean,
-    ctx: CollectContext, out: SlurObstacle[],
+    ownVoice: boolean, ctx: CollectContext, out: SlurObstacle[],
 ): void {
     const t: number = chordT(xPx, yPx, ctx);
     if (t < ctx.minT || t > ctx.maxT) { return; }
-    out.push({ xPx, yPx, kind, trusted });
+    out.push({ xPx, yPx, kind, trusted, ownVoice });
 }
 
-/** Walk every VF note on a staffline in the slur's X range. */
-function forEachNote(sl: StaffLine, cb: (vf: VF.StemmableNote) => void): void {
+/** Walk every VF note on a staffline in the slur's X range, stamping whether the
+ *  note belongs to the slur's own voice. */
+function forEachNote(
+    sl: StaffLine, ctx: CollectContext, cb: (vf: VF.StemmableNote, ownVoice: boolean) => void,
+): void {
     for (const gm of sl.Measures) {
         for (const gse of gm.staffEntries) {
             if (!gse.graphicalVoiceEntries) { continue; }
             for (const gve of gse.graphicalVoiceEntries) {
                 const vf: VF.StemmableNote | undefined = (gve as VexFlowVoiceEntry).vfStaveNote;
-                if (vf) { cb(vf); }
+                if (vf) {
+                    const voiceId: number | undefined =
+                        (gve as VexFlowVoiceEntry).parentVoiceEntry?.ParentVoice?.VoiceId;
+                    cb(vf, ctx.ownVoiceId !== undefined && voiceId === ctx.ownVoiceId);
+                }
             }
         }
     }
@@ -138,19 +154,22 @@ export function collectSlurObstaclesStaffRelative(ctx: CollectContext): SlurObst
                 if (!anyNote.getNoteHeadBounds) { continue; } // ghost note
                 const stave: any = vf.getStave?.();
                 if (!stave) { continue; }
+                const voiceId: number | undefined =
+                    (gve as VexFlowVoiceEntry).parentVoiceEntry?.ParentVoice?.VoiceId;
+                const ownVoice: boolean = ctx.ownVoiceId !== undefined && voiceId === ctx.ownVoiceId;
                 const bounds: { yTop: number, yBottom: number } = anyNote.getNoteHeadBounds();
                 const x: number = vf.getAbsoluteX() + vf.getGlyphWidth() / 2 - stave.getX() + mRelX * unitInPixels;
                 if (x < Math.min(ctx.startXPx, ctx.endXPx) || x > Math.max(ctx.startXPx, ctx.endXPx)) { continue; }
 
                 const headY: number = ctx.above ? bounds.yTop : bounds.yBottom;
-                push(x, headY - stave.getY(), "notehead", false, ctx, out);
+                push(x, headY - stave.getY(), "notehead", false, ownVoice, ctx, out);
 
                 // Stem tip only when the stem points toward the slur side.
                 const dir: number = vf.getStemDirection?.() ?? 0;
                 const towardSlur: boolean = (ctx.above && dir === 1) || (!ctx.above && dir === -1);
                 if (towardSlur && anyNote.getStemExtents) {
                     const ext: { topY: number, baseY: number } = anyNote.getStemExtents();
-                    push(x, ext.topY - stave.getY(), "stem", false, ctx, out);
+                    push(x, ext.topY - stave.getY(), "stem", false, ownVoice, ctx, out);
                 }
             }
         }
@@ -170,9 +189,9 @@ export function collectSlurObstaclesStaffRelative(ctx: CollectContext): SlurObst
 export function collectSlurObstacles(ctx: CollectContext): SlurObstacle[] {
     const out: SlurObstacle[] = [];
 
-    forEachNote(ctx.staffLine, (vf: VF.StemmableNote) => {
+    forEachNote(ctx.staffLine, ctx, (vf: VF.StemmableNote, ownVoice: boolean) => {
         if (ctx.excludeNotes.has(vf)) { return; }
-        noteObstaclesTrusted(vf, ctx, out);
+        noteObstaclesTrusted(vf, ownVoice, ctx, out);
     });
 
     // Sibling-staff obstacles: a slur drawn on one staff can still pass over
@@ -210,17 +229,18 @@ export function collectSlurObstacles(ctx: CollectContext): SlurObstacle[] {
         const before: number = out.length;
         if (sibAbove) {
             // Drawn earlier → VF stave Y is final. Read pixels directly.
-            forEachNote(sib, (vf: VF.StemmableNote) => {
+            forEachNote(sib, ctx, (vf: VF.StemmableNote, ownVoice: boolean) => {
                 if (ctx.excludeNotes.has(vf)) { return; }
-                noteObstaclesTrusted(vf, ctx, out);
+                noteObstaclesTrusted(vf, ownVoice, ctx, out);
             });
         } else {
             // Not yet drawn → reconstruct notehead-top/bottom Y from the model.
             collectModelObstacles(sib, ctx, out);
         }
-        // Keep only sibling obstacles within perpendicular reach of the chord.
+        // Keep only FOREIGN sibling obstacles within perpendicular reach of the
+        // chord. Own-voice sibling notes are the slur's line — always in its path.
         for (let i: number = out.length - 1; i >= before; i--) {
-            if (!inReach(out[i])) { out.splice(i, 1); }
+            if (!out[i].ownVoice && !inReach(out[i])) { out.splice(i, 1); }
         }
     }
     return out;
@@ -248,7 +268,10 @@ function collectModelObstacles(sib: StaffLine, ctx: CollectContext, out: SlurObs
                 const noteXPx: number = (sibAbsX + mRelX + eRelX + gveRelX) * unitInPixels;
                 const yBase: number = sibAbsY + mRelY + gveRelY;
                 const yPx: number = (yBase + (ctx.above ? borderTop : borderBottom)) * unitInPixels;
-                push(noteXPx, yPx, "notehead", false, ctx, out);
+                const voiceId: number | undefined =
+                    (gve as VexFlowVoiceEntry).parentVoiceEntry?.ParentVoice?.VoiceId;
+                const ownVoice: boolean = ctx.ownVoiceId !== undefined && voiceId === ctx.ownVoiceId;
+                push(noteXPx, yPx, "notehead", false, ownVoice, ctx, out);
             }
         }
     }
