@@ -35,7 +35,7 @@ import { VexFlowGraphicalNote } from "./VexFlowGraphicalNote";
 import { SvgVexFlowBackend } from "./SvgVexFlowBackend";
 import { VexFlowVibratoBracket } from "./VexFlowVibratoBracket";
 import { BracketHand } from "../../VoiceData/Expressions/ContinuousExpressions/BracketHand";
-import { TremoloBetweenNotes } from "../../VoiceData/Note";
+import { Note, TremoloBetweenNotes } from "../../VoiceData/Note";
 import { SkyBottomLineCalculator } from "../SkyBottomLineCalculator";
 
 /**
@@ -50,6 +50,9 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
     private backends: VexFlowBackend[] = [];
     private zoom: number = 1.0;
     private pageIdx: number = 0; // this is a bad solution, should use MusicPage.PageNumber instead.
+    private dynamicCounter: number = 0;
+    private pedalCounter: number = 0;
+    private chordPerMeasureCounter: Map<number, number> = new Map();
 
     constructor(drawingParameters: DrawingParameters = new DrawingParameters()) {
         super(new VexFlowTextMeasurer(drawingParameters.Rules), drawingParameters);
@@ -692,8 +695,24 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
 
     private drawStaffEntry(staffEntry: GraphicalStaffEntry): void {
         if (staffEntry.FingeringEntries.length > 0) {
-            for (const fingeringEntry of staffEntry.FingeringEntries) {
+            // Get note ID from the staff entry's first pitched note for data-fingering-id.
+            // Fingerings belong to the top note of the chord in OSMD's model.
+            let fingeringNoteId: string = "";
+            for (const gve of staffEntry.graphicalVoiceEntries) {
+                for (const note of gve.notes) {
+                    if (note.sourceNote.xmlId) {
+                        fingeringNoteId = note.sourceNote.xmlId;
+                        break;
+                    }
+                }
+                if (fingeringNoteId) { break; }
+            }
+            for (let i: number = 0; i < staffEntry.FingeringEntries.length; i++) {
+                const fingeringEntry: GraphicalLabel = staffEntry.FingeringEntries[i];
                 fingeringEntry.SVGNode = this.drawLabel(fingeringEntry, GraphicalLayers.Notes);
+                if (fingeringEntry.SVGNode && fingeringNoteId) {
+                    (fingeringEntry.SVGNode as SVGElement).setAttribute("data-fingering-id", `fingering-${fingeringNoteId}-${i}`);
+                }
             }
             this.drawFingeringSubstitutionSlur(staffEntry.FingeringEntries);
         }
@@ -702,6 +721,17 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             for (const graphicalChordContainer of staffEntry.graphicalChordContainers) {
                 const label: GraphicalLabel = graphicalChordContainer.GraphicalLabel;
                 label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
+                if (label.SVGNode) {
+                    // Use printed measure number (XML number attribute when integer,
+                    // falling back to sequential MeasureNumber). This ensures the
+                    // chord ID matches the XML measure[number] attribute across
+                    // sliced/full score contexts.
+                    const measureNum: number = staffEntry.parentMeasure.parentSourceMeasure.getPrintedMeasureNumber();
+                    const idx: number = this.chordPerMeasureCounter.get(measureNum) ?? 0;
+                    this.chordPerMeasureCounter.set(measureNum, idx + 1);
+                    const chordId: string = `chord-m${measureNum}-${idx}`;
+                    (label.SVGNode as SVGElement).setAttribute("data-chord-id", chordId);
+                }
             }
         }
         if (this.rules.RenderLyrics) {
@@ -782,6 +812,13 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             label.Label.colorDefault = this.rules.DefaultColorLyrics;
             label.SVGNode = this.drawLabel(label, layer);
             (label.SVGNode as SVGGElement)?.classList.add("lyrics");
+            // Attach data-lyric-id for editor selection: <noteId>-lyric-<verse>
+            const lyricNote: Note = lyricsEntry.LyricsEntry?.Parent?.Notes[0];
+            const lyricNoteId: string = lyricNote?.xmlId ?? lyricNote?.computedSvgId();
+            if (lyricNoteId && label.SVGNode) {
+                const verse: string = lyricsEntry.LyricsEntry.VerseNumber || "1";
+                (label.SVGNode as Element).setAttribute("data-lyric-id", `${lyricNoteId}-lyric-${verse}`);
+            }
         });
     }
 
@@ -814,7 +851,20 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                 }
                 textBracket.setContext(ctx);
                 try {
-                    textBracket.draw();
+                    const octShiftId: string | undefined = vexFlowOctaveShift.startNote?.getAttribute("id");
+                    const typeMap: Record<number, string> = { 0: "8va", 1: "8vb", 2: "15ma", 3: "15mb" };
+                    const suffix: string = typeMap[vexFlowOctaveShift.getOctaveShift.Type] || "shift";
+                    if (octShiftId) {
+                        const fullId: string = `${octShiftId}-${suffix}`;
+                        const grp: SVGGElement = (ctx as any).openGroup("octave-shift", `octave-shift-${fullId}`);
+                        if (grp) {
+                            grp.setAttribute("data-octave-shift-id", fullId);
+                        }
+                        textBracket.draw();
+                        (ctx as any).closeGroup();
+                    } else {
+                        textBracket.draw();
+                    }
                 } catch (ex) {
                     log.warn(ex);
                 }
@@ -827,10 +877,14 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             if (graphicalPedal) {
                 const vexFlowPedal: VexFlowPedal = graphicalPedal as VexFlowPedal;
                 const ctx: VF.RenderContext = this.backend.getContext();
+                const pedalId: string = `pedal-${++this.pedalCounter}`;
+                const pedalGroup: SVGGElement = (ctx as any).openGroup("pedal", pedalId);
+                if (pedalGroup) { pedalGroup.setAttribute("data-pedal-id", pedalId); }
                 const pedalMarking: VF.PedalMarking = vexFlowPedal.getPedalMarking();
                 (pedalMarking as any).renderOptions.color = this.rules.DefaultColorMusic;
                 pedalMarking.setContext(ctx);
                 pedalMarking.draw();
+                (ctx as any).closeGroup();
             }
         }
     }
@@ -929,6 +983,10 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
     protected drawInstantaneousDynamic(instantaneousDynamic: GraphicalInstantaneousDynamicExpression): void {
         const label: GraphicalLabel = (instantaneousDynamic as VexFlowInstantaneousDynamicExpression).Label;
         label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
+        if (label.SVGNode) {
+            (label.SVGNode as Element).setAttribute("data-dynamic-id", "dyn-" + this.dynamicCounter);
+            this.dynamicCounter++;
+        }
     }
 
     protected drawContinuousDynamic(graphicalExpression: VexFlowContinuousDynamicExpression): void {
@@ -936,6 +994,10 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             const label: GraphicalLabel = graphicalExpression.Label;
             label.SVGNode = this.drawLabel(label, <number>GraphicalLayers.Notes);
         } else {
+            const ctx: VF.RenderContext = this.backend.getContext();
+            const wedgeNum: number = graphicalExpression.ContinuousDynamic?.NumberXml || 0;
+            const wedgeGroup: SVGGElement = (ctx as any).openGroup("wedge", `wedge-${wedgeNum}`);
+            if (wedgeGroup) {wedgeGroup.setAttribute("data-wedge-id", `wedge-${wedgeNum}`);}
             for (const line of graphicalExpression.Lines) {
                 const start: PointF2D = new PointF2D(graphicalExpression.ParentStaffLine.PositionAndShape.AbsolutePosition.x + line.Start.x,
                                                      graphicalExpression.ParentStaffLine.PositionAndShape.AbsolutePosition.y + line.Start.y);
@@ -944,6 +1006,7 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
                 line.SVGElement = this.drawLine(start, end, line.colorHex ?? "#000000", line.Width);
                 // the null check for colorHex is not strictly necessary anymore, but the previous default color was red.
             }
+            (ctx as any).closeGroup();
         }
     }
 

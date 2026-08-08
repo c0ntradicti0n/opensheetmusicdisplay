@@ -74,6 +74,7 @@ export class VexFlowMeasure extends GraphicalMeasure {
     public formatVoices?: (width: number, parent: VexFlowMeasure) => void;
     /** The VexFlow Ties in the measure */
     public vfTies: VF.StaveTie[] = [];
+    private tieNoteIdMap: Map<VF.StaveTie, string> = new Map();
     /** The repetition instructions given as words or symbols (coda, dal segno..) */
     public vfRepetitionWords: VF.Repetition[] = [];
     public hasMetronomeMark: boolean = false;
@@ -150,6 +151,7 @@ export class VexFlowMeasure extends GraphicalMeasure {
 
     public clean(): void {
         this.vfTies.length = 0;
+        this.tieNoteIdMap.clear();
         this.connectors = [];
         // Clean up instructions
         this.resetLayout();
@@ -839,6 +841,12 @@ export class VexFlowMeasure extends GraphicalMeasure {
                             (vftuplet as any).RenderTupletNumber = true;
                         }
                         vftuplet.setContext(ctx).draw();
+                        const tupletFirstNote: Note = tuplet.Notes[0][0];
+                        const tupletNoteId: string = tupletFirstNote.xmlId ?? tupletFirstNote.computedSvgId();
+                        if (tupletNoteId) {
+                            const tupletEl: HTMLElement | null = document.getElementById("vf-" + vftuplet.getAttribute("id"));
+                            if (tupletEl) {tupletEl.setAttribute("data-tuplet-id", tupletNoteId + "-tuplet");}
+                        }
                     }
                 }
             }
@@ -851,8 +859,70 @@ export class VexFlowMeasure extends GraphicalMeasure {
             }
             tie.setContext(ctx);
             tie.draw();
+            const tieNoteId: string | undefined = this.tieNoteIdMap.get(tie);
+            if (tieNoteId) {
+                const tieEl: HTMLElement | null = document.getElementById("vf-" + tie.getAttribute("id"));
+                if (tieEl) {tieEl.setAttribute("data-tie-id", tieNoteId + "-tie");}
+            }
         }
         ctx.closeGroup(); // close measure group
+
+        // Attach data attributes for editor selection
+        if (typeof document !== "undefined") {
+            const staffIdx: number = ((this.ParentStaffLine as any)?.ParentStaff?.idInMusicSheet ?? 0) + 1;
+            const mNum: number = this.parentSourceMeasure?.MeasureNumberXML ?? this.MeasureNumber;
+            let clefCount: number = 0;
+            document.querySelectorAll(".vf-clef").forEach((el: Element) => {
+                if (!el.getAttribute("data-clef-id")) {
+                    el.setAttribute("data-clef-id", `clef-m${mNum}-s${staffIdx}-${clefCount++}`);
+                }
+            });
+            let tempoCount: number = 0;
+            document.querySelectorAll(".vf-stavetempo").forEach((el: Element) => {
+                if (!el.getAttribute("data-tempo-id")) {
+                    el.setAttribute("data-tempo-id", `tempo-m${mNum}-s${staffIdx}-${tempoCount++}`);
+                }
+            });
+            let ksCount: number = 0;
+            document.querySelectorAll(".vf-keysignature").forEach((el: Element) => {
+                if (!el.getAttribute("data-key-signature-id")) {
+                    el.setAttribute("data-key-signature-id", `keysig-m${mNum}-${ksCount++}`);
+                }
+            });
+            const artCountByNote: Map<string, number> = new Map();
+            document.querySelectorAll(".vf-articulation").forEach((el: Element) => {
+                if (el.getAttribute("data-articulation-id")) { return; }
+                const noteEl: Element | null = el.closest("[data-note-id]");
+                if (!noteEl) { return; }
+                const noteId: string | null = noteEl.getAttribute("data-note-id");
+                if (!noteId) { return; }
+                const count: number = artCountByNote.get(noteId) || 0;
+                el.setAttribute("data-articulation-id", `art-${noteId}-${count}`);
+                artCountByNote.set(noteId, count + 1);
+            });
+            const ornCountByNote: Map<string, number> = new Map();
+            document.querySelectorAll(".vf-ornament").forEach((el: Element) => {
+                if (el.getAttribute("data-ornament-id")) { return; }
+                const noteEl: Element | null = el.closest("[data-note-id]");
+                if (!noteEl) { return; }
+                const noteId: string | null = noteEl.getAttribute("data-note-id");
+                if (!noteId) { return; }
+                const count: number = ornCountByNote.get(noteId) || 0;
+                el.setAttribute("data-ornament-id", `orn-${noteId}-${count}`);
+                ornCountByNote.set(noteId, count + 1);
+            });
+            const accCountByNote: Map<string, number> = new Map();
+            document.querySelectorAll(".vf-accidental").forEach((el: Element) => {
+                if (el.getAttribute("data-accidental-id")) { return; }
+                const noteEl: Element | null = el.closest("[data-note-id]");
+                if (!noteEl) { return; }
+                const noteId: string | null = noteEl.getAttribute("data-note-id");
+                if (!noteId) { return; }
+                const count: number = accCountByNote.get(noteId) || 0;
+                el.setAttribute("data-accidental-id", `acc-${noteId}-${count}`);
+                accCountByNote.set(noteId, count + 1);
+            });
+        }
 
         // Draw vertical lines
         for (const connector of this.connectors) {
@@ -2320,6 +2390,10 @@ export class VexFlowMeasure extends GraphicalMeasure {
     public addStaveTie(stavetie: VF.StaveTie, graphicalTie: GraphicalTie): void {
         this.vfTies.push(stavetie);
         graphicalTie.vfTie = stavetie;
+        const tieStartNoteId: string = graphicalTie.StartNote?.sourceNote?.xmlId;
+        if (tieStartNoteId) {
+            this.tieNoteIdMap.set(stavetie, tieStartNoteId);
+        }
         if (graphicalTie.Tie.TieDirection === PlacementEnum.Below) {
             (stavetie as any).setDirection(1);
         }
