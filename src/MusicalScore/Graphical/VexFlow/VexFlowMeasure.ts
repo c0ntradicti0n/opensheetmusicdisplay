@@ -1677,6 +1677,45 @@ export class VexFlowMeasure extends GraphicalMeasure {
                 if (existingBeam) {
                     (existingBeam as any).notes = allNotes;
                 } else {
+                    // The tuplet's notes may already be connected by the MusicXML
+                    // cross-staff beam: fixCrossStaffBeams on the beam-owner measure
+                    // (earlier in the measure list) extends it to span every note.
+                    // Creating a second beam here would re-draw the shared stems
+                    // (visible duplicate beam) — skip when an existing beam on this
+                    // or the sibling measure already spans all of the tuplet's notes.
+                    // The tuplet still renders its number/bracket via the vfTuplet.
+                    const beamArrays: (VF.Beam[] | undefined)[] = [
+                        this.vfbeams[voiceID],
+                        this.autoVfBeams,
+                        siblingMeasure.vfbeams[voiceID],
+                        siblingMeasure.autoVfBeams,
+                        siblingMeasure.autoTupletVfBeams,
+                    ];
+                    let coveringBeam: VF.Beam = undefined;
+                    for (const beams of beamArrays) {
+                        if (!beams) { continue; }
+                        for (const b of beams) {
+                            const bn: VF.Note[] = b.getNotes();
+                            if (bn.length >= allNotes.length && allNotes.every((n) => bn.indexOf(n) >= 0)) {
+                                coveringBeam = b;
+                                break;
+                            }
+                        }
+                        if (coveringBeam) { break; }
+                    }
+                    if (coveringBeam) {
+                        // The tuplet's notes are already connected by an existing
+                        // cross-staff beam — creating a second beam here would
+                        // re-draw the shared stems (visible duplicate). The tuplet
+                        // still renders its number/bracket via the vfTuplet.
+                        // Restore the beam refs: the setStemDirection calls above
+                        // cleared them, which would otherwise make these notes draw
+                        // their own stems in addition to the beam's.
+                        for (const note of allNotes) {
+                            (note as StaveNote).setBeam(coveringBeam);
+                        }
+                        continue;
+                    }
                     existingBeam = new VF.Beam(allNotes as StaveNote[], false);
                     this.autoTupletVfBeams.push(existingBeam);
                 }
@@ -1847,6 +1886,22 @@ export class VexFlowMeasure extends GraphicalMeasure {
                 };
                 removeSiblingBeam(siblingMeasure.vfbeams[voiceID]);
                 removeSiblingBeam(siblingMeasure.autoVfBeams);
+                // A tuplet beam created for this cross-staff beam's notes (tuplet
+                // on the owner measure, created by its fixCrossStaffTuplets before
+                // this ran) is now redundant — the main beam spans the same notes.
+                const removeRedundantTupletBeams: (beams: VF.Beam[] | undefined) => void =
+                    (beams: VF.Beam[] | undefined): void => {
+                    if (!beams) { return; }
+                    for (let i: number = beams.length - 1; i >= 0; i--) {
+                        const tbNotes: any[] = beams[i].getNotes();
+                        const covered: boolean = tbNotes.length > 0 && tbNotes.every((n) => newNotes.indexOf(n) >= 0);
+                        if (covered) {
+                            beams.splice(i, 1);
+                        }
+                    }
+                };
+                removeRedundantTupletBeams(this.autoTupletVfBeams);
+                removeRedundantTupletBeams(siblingMeasure.autoTupletVfBeams);
             }
         }
     }
