@@ -291,6 +291,23 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
             measure.PositionAndShape.AbsolutePosition.x * unitInPixels,
             measure.PositionAndShape.AbsolutePosition.y * unitInPixels
         );
+        // Cross-staff beams owned by this measure reference the sibling measure's
+        // stave for beam Y / stem geometry. Draw order is per-staffline (treble
+        // first), so when this is the treble-owned beam, the bass sibling's stave
+        // has NOT been drawn/positioned yet — its raw y is still stale (0 or a
+        // leftover from an earlier pass). Sync every sibling stave from its
+        // canonical AbsolutePosition BEFORE drawing, so positionCrossStaffBeams
+        // (called inside measure.draw) sees the real staff positions. Without
+        // this, single-line/horizontal-staffline scores collapse the bass stem
+        // to a stub at treble level.
+        for (const [, siblingMeasure] of (measure as any).crossStaffBeamSiblings) {
+            const siblingStave: VF.Stave = siblingMeasure.stave;
+            const absPos: PointF2D = siblingMeasure.PositionAndShape.AbsolutePosition;
+            if (absPos && absPos.y > 0) {
+                siblingStave.setX(absPos.x * unitInPixels);
+                siblingStave.setY(absPos.y * unitInPixels);
+            }
+        }
         try {
             measure.draw(this.backend.getContext());
             // Vexflow errors can happen here. If we don't catch errors, rendering will stop after this measure.
