@@ -1,0 +1,455 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE score-partwise PUBLIC
+  "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+  "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise>
+  <part-list>
+    <score-part id="P1">
+      <part-name>鋼琴</part-name>
+      <part-abbreviation>Pno.</part-abbreviation>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <!--=======================================================-->
+    <measure number="76">
+      <attributes>
+        <staves>2</staves>
+        <divisions>120</divisions>
+        <key>
+          <fifths>-4</fifths>
+        </key>
+        <time>
+          <beats>2</beats>
+          <beat-type>4</beat-type>
+        </time>
+        <clef number="1">
+          <sign>G</sign>
+          <line>2</line>
+        </clef>
+        <clef number="2">
+          <sign>G</sign>
+          <line>2</line>
+        </clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>88</per-minute>
+          </metronome>
+        </direction-type>
+        <sound tempo="88"/>
+      </direction>
+      <direction>
+        <direction-type>
+          <dynamics>
+            <ff/>
+          </dynamics>
+        </direction-type>
+      </direction>
+      <direction placement="below">
+        <direction-type>
+          <pedal type="start" line="yes"/>
+        </direction-type>
+        <staff>2</staff>
+      </direction>
+      <print new-system="yes"/>
+      <note default-x="108.81" default-y="0.00" id="n1787">
+        <pitch>
+          <step>F</step>
+          <octave>5</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">begin</beam>
+        <beam number="2">begin</beam>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+        <sound dynamics="20.47"/>
+      </note>
+      <note default-x="148.07" default-y="-25.00" id="n1788">
+        <pitch>
+          <step>A</step>
+          <alter>-1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <sound dynamics="25.20"/>
+      </note>
+      <note default-x="187.32" default-y="-10.00" id="n1789">
+        <pitch>
+          <step>D</step>
+          <alter>-1</alter>
+          <octave>5</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+        <sound dynamics="22.05"/>
+      </note>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>84</per-minute>
+          </metronome>
+        </direction-type>
+        <sound tempo="84"/>
+      </direction>
+      <note default-x="226.58" default-y="-35.00" id="n1790">
+        <pitch>
+          <step>F</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+        <sound dynamics="23.62"/>
+      </note>
+      <note default-x="265.84" default-y="-25.00" id="n1791">
+        <pitch>
+          <step>A</step>
+          <alter>-1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <sound dynamics="18.90"/>
+      </note>
+      <note default-x="305.10" default-y="-45.00" id="n1792">
+        <pitch>
+          <step>D</step>
+          <alter>-1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+        <sound dynamics="23.62"/>
+      </note>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>80</per-minute>
+          </metronome>
+        </direction-type>
+        <sound tempo="80"/>
+      </direction>
+      <note default-x="344.36" default-y="-35.00" id="n1793">
+        <pitch>
+          <step>F</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+        <sound dynamics="19.69"/>
+      </note>
+      <attributes>
+        <clef number="2">
+          <sign>F</sign>
+          <line>4</line>
+        </clef>
+      </attributes>
+      <note default-x="393.62" default-y="-125.01" id="n1794">
+        <pitch>
+          <step>A</step>
+          <alter>-1</alter>
+          <octave>3</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <sound dynamics="27.56"/>
+      </note>
+      <note default-x="432.88" default-y="-110.01" id="n1795">
+        <pitch>
+          <step>D</step>
+          <alter>-1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+        <sound dynamics="18.90"/>
+      </note>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>76</per-minute>
+          </metronome>
+        </direction-type>
+        <sound tempo="76"/>
+      </direction>
+      <note default-x="472.14" default-y="-135.01" id="n1796">
+        <pitch>
+          <step>F</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+        <sound dynamics="26.77"/>
+      </note>
+      <note default-x="511.40" default-y="-125.01" id="n1797">
+        <pitch>
+          <step>A</step>
+          <alter>-1</alter>
+          <octave>3</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <sound dynamics="19.69"/>
+      </note>
+      <note default-x="550.66" default-y="-145.01" id="n1798">
+        <pitch>
+          <step>D</step>
+          <alter>-1</alter>
+          <octave>3</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <beam number="1">end</beam>
+        <beam number="2">end</beam>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+        <sound dynamics="28.35"/>
+      </note>
+      <backup>
+        <duration>240</duration>
+      </backup>
+      <note print-object="no" id="r140">
+        <rest/>
+        <duration>40</duration>
+        <voice>5</voice>
+        <type>eighth</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+      </note>
+      <note print-object="no" id="r141">
+        <rest/>
+        <duration>20</duration>
+        <voice>5</voice>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+      </note>
+      <note print-object="no" id="r142">
+        <rest/>
+        <duration>40</duration>
+        <voice>5</voice>
+        <type>eighth</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+      </note>
+      <note print-object="no" id="r143">
+        <rest/>
+        <duration>20</duration>
+        <voice>5</voice>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+      </note>
+      <note print-object="no" id="r144">
+        <rest/>
+        <duration>20</duration>
+        <voice>5</voice>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+      </note>
+      <note print-object="no" id="r145">
+        <rest/>
+        <duration>40</duration>
+        <voice>5</voice>
+        <type>eighth</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+      </note>
+      <note print-object="no" id="r146">
+        <rest/>
+        <duration>40</duration>
+        <voice>5</voice>
+        <type>eighth</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+      </note>
+      <note print-object="no" id="r147">
+        <rest/>
+        <duration>20</duration>
+        <voice>5</voice>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>2</staff>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
