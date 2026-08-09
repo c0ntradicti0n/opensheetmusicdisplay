@@ -56,9 +56,17 @@ export interface SlurQualityReport {
     tMin: number;
     tMax: number;
     obstacleCount: number;
+    /** Curve crosses a notehead body (|gap| < tolerance) in the t-window. A
+     *  curve passing BELOW a foreign notehead is not a collision — only a real
+     *  crossing of the notehead body is. */
     collision: boolean;
     /** Collision judged against all obstacles (no t-window). */
     collisionAll: boolean;
+    /** Number of t-window obstacles the curve crosses (|gap| < tolerance). */
+    crossingCount: number;
+    /** Obstacles the curve passes below/above cleanly (|gap| ≥ tolerance on the
+     *  non-clearing side) — foreign-avoid crossings, correct by design. */
+    passBelowCount: number;
     leakPx: number;
     leakOverlap: boolean;
     balloon: boolean;
@@ -260,12 +268,20 @@ function measureSlur(
         start.x, start.y, startCp.x, startCp.y, endCp.x, endCp.y, end.x, end.y, 100);
 
     // ── Clearance oracle: min signed gap in the clearable t-window ─────────
+    // The signed gap is positive when the curve clears an obstacle on the slur
+    // side. Since the obstacle fix lets the curve pass BELOW foreign obstacles
+    // (avoid-crossing, never balloon-over), a negative gap is only a collision
+    // when the curve actually CROSSES the notehead body (|gap| < tolerance).
+    // Passing cleanly below a foreign notehead is correct behavior.
     const tMin: number = GraphicalSlur.clearableMinT;
     const tMax: number = GraphicalSlur.clearableMaxT;
     const chordLenSq: number = Math.max(0.01, chordLenPx * chordLenPx);
     let clearancePx: number = Infinity;
     let clearanceT: number = -1;
     let clearanceAllPx: number = Infinity;
+    let crossingCount: number = 0;
+    let crossingAllCount: number = 0;
+    let passBelowCount: number = 0;
     const gapAt = (obs: PxPoint): { gap: number, idx: number, t: number } => {
         const tObs: number = ((obs.x - start.x) * chordDx + (obs.y - start.y) * chordDy) / chordLenSq;
         let bestIdx: number = -1;
@@ -281,11 +297,14 @@ function measureSlur(
     for (const obs of obstacles) {
         const { gap, t: tObs } = gapAt(obs);
         if (gap < clearanceAllPx) { clearanceAllPx = gap; }
+        if (Math.abs(gap) < SLUR_COLLISION_TOLERANCE_PX) { crossingAllCount++; }
         if (tObs < tMin || tObs > tMax) { continue; }
         if (gap < clearancePx) { clearancePx = gap; clearanceT = tObs; }
+        if (Math.abs(gap) < SLUR_COLLISION_TOLERANCE_PX) { crossingCount++; }
+        if (gap < -SLUR_COLLISION_TOLERANCE_PX) { passBelowCount++; }
     }
-    const collision: boolean = clearancePx < SLUR_COLLISION_TOLERANCE_PX;
-    const collisionAll: boolean = clearanceAllPx < SLUR_COLLISION_TOLERANCE_PX;
+    const collision: boolean = crossingCount > 0;
+    const collisionAll: boolean = crossingAllCount > 0;
     const obstacleCount: number = obstacles.filter(
         o => { const t = ((o.x - start.x) * chordDx + (o.y - start.y) * chordDy) / chordLenSq; return t >= tMin && t <= tMax; },
     ).length;
@@ -374,6 +393,8 @@ function measureSlur(
         obstacleCount,
         collision,
         collisionAll,
+        crossingCount,
+        passBelowCount,
         leakPx,
         leakOverlap,
         balloon,

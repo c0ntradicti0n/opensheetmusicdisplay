@@ -55,10 +55,12 @@ interface ScoreConfig {
 }
 
 const SCORES: ScoreConfig[] = [
+        { name: "Dichterliebe", path: "Dichterliebe01.xml", maxCpY: 8.0 },
+
     { name: "John Field", path: ".john-field-piano-concerto-7_m318-323.mxl", maxCpY: 6.0 },
-    { name: "Dichterliebe", path: "Dichterliebe01.xml", maxCpY: 8.0 },
     { name: "Beethoven", path: "Beethoven_AnDieFerneGeliebte.xml", maxCpY: 6.0 },
-    { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0 },
+        { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0 },
+
 ];
 
 // ── SVG BBox helpers ─────────────────────────────────────────────────────────
@@ -416,9 +418,11 @@ function bezierCollidesWithObstacles(
         }
         if (bestIdx < 0) { continue; }
         const by: number = sampleY[bestIdx];
-        // Tolerance shared with SlurQualityConstants — clearing within half a staff space is acceptable
-        if (above && by > obs.y + SLUR_COLLISION_TOLERANCE_PX) { return true; }
-        if (!above && by < obs.y - SLUR_COLLISION_TOLERANCE_PX) { return true; }
+        // Crossing-aware collision: the curve only collides when it CROSSES the
+        // notehead body (|bezierY − noteheadY| < tolerance). Passing cleanly
+        // below/above a foreign notehead is correct avoid-crossing behavior, not
+        // a collision. Tolerance shared with SlurQualityConstants.
+        if (Math.abs(by - obs.y) < SLUR_COLLISION_TOLERANCE_PX) { return true; }
     }
     return false;
 }
@@ -494,10 +498,10 @@ function addSvgObstacles(svg: SVGSVGElement, slurs: SlurInfo[]): void {
         if (!s.isCrossed) {
             // VF5: g.vf-stavenote is a SIBLING of g.vf-stave (both under g.vf-measure),
             // so closest("g.vf-stave") fails. Instead match the start note's own
-            // SVG Y against the nearest stave range.
-            const startTextEl: Element | null = svg.querySelector(`[data-note-id="${s.id}"] text`);
-            const startYAttr: string | null = startTextEl?.getAttribute("y") ?? null;
-            const startNoteY: number = startYAttr ? parseFloat(startYAttr) : chordMidY;
+            // SVG Y against the nearest stave range. nhMap already holds the start
+            // note's text-Y — no per-slur DOM query.
+            const startPos: { x: number, y: number } | undefined = nhMap.get(s.id)?.[0];
+            const startNoteY: number = startPos ? startPos.y : chordMidY;
             chordStaveIdx = nearestStave(startNoteY);
         }
         for (const [xmlId, positions] of nhMap) {
@@ -575,6 +579,13 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
     // Replace OSMD-converted injected/stem points with SVG-verified positions
     addSvgObstacles(clone, slurs);
 
+    // Pre-index every id'd element once — the per-slur querySelector scans the
+    // whole multi-MB DOM each time, which dominates for large scores (Liszt).
+    const idToEl: Map<string, Element> = new Map();
+    for (const el of clone.querySelectorAll("[id]")) {
+        idToEl.set(el.getAttribute("id") ?? "", el);
+    }
+
 
     for (const s of slurs) {
         // Detect real collision: does the bezier curve actually intersect any obstacle point?
@@ -599,7 +610,7 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
 
         // Draw obstacle points as circles for ALL slurs (not just problem ones)
         if (s.obstacleSvgPoints.length > 0 && s.startCp) {
-            const sg: Element | null = clone.querySelector(`[id="vf-${s.id}-slur"]`);
+            const sg: Element | undefined = idToEl.get(`vf-${s.id}-slur`);
             if (sg && sg.parentNode) {
                 for (const op of s.obstacleSvgPoints) {
                     const isSky: boolean = op.cat === "skyline";
@@ -618,9 +629,8 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
         // Problem annotations (balloon/leak) only for problematic slurs
         if (!isProblem || !s.startCp) { continue; }
 
-        // Find the slur SVG group by ID
-        const slurId: string = `vf-${s.id}-slur`;
-        const slurGroup: Element | null = clone.querySelector(`[id="${slurId}"]`);
+        // Find the slur SVG group by ID (indexed once above)
+        const slurGroup: Element | undefined = idToEl.get(`vf-${s.id}-slur`);
         if (!slurGroup) { continue; }
 
         // Ballooning gets blue dashed marking; collision/leak stays red.
@@ -767,13 +777,13 @@ describe("Debug slur obstacles", () => {
 
                 noteheadBBoxes = queryNoteheadBBoxes(svg);
                 slurBBoxes = querySlurBBoxes(svg, vfIdToXmlId);
-            });
+            }, 300000); // Liszt loads + renders a multi-page score in jsdom — far beyond the 10s hook default
 
             afterAll(() => {
                 if (svg && slurs.length > 0) {
                     try { writeAnnotatedSvg(svg, slurs, cfg); } catch (_e) { /* skip if fs unavailable */ }
                 }
-            });
+            }, 300000); // writeAnnotatedSvg deep-clones the multi-MB SVG and walks it repeatedly
 
             // ── Assertions ───────────────────────────────────────────────
 
@@ -912,11 +922,11 @@ describe("Debug slur obstacles", () => {
                 const agg = aggregateSlurQuality(reports);
                 console.warn(`\n  ── Ground-truth report (${reports.length} slurs) ──`);
                 console.warn(`    frame=${reports[0]?.frame ?? "?"} trusted=${reports.filter(r => r.trusted).length}/${reports.length} untrusted=${agg.untrusted}`);
-                console.warn(`    collisions=${agg.collisions} balloons=${agg.balloons} leaks=${agg.leaks} leakOverlaps=${agg.leakOverlaps}`);
+                console.warn(`    crossings=${agg.collisions} balloons=${agg.balloons} leaks=${agg.leaks} leakOverlaps=${agg.leakOverlaps}`);
                 console.warn(`    meanClearancePx=${agg.meanClearancePx.toFixed(1)} minClearancePx=${agg.minClearancePx.toFixed(1)} meanBowRatio=${agg.meanBowRatio.toFixed(3)} maxBowRatio=${agg.maxBowRatio.toFixed(3)}`);
                 for (const r of reports) {
                     const flag: string = r.collision ? " 💥" : r.balloon ? " 🎈" : "";
-                    console.warn(`    ${r.id}${flag} frame=${r.frame} crossed=${r.isCrossed} ${r.placement} clearance=${r.clearancePx.toFixed(1)}px@t=${r.clearanceT.toFixed(2)} bow=${r.bowPx.toFixed(1)}px r=${r.bowRatio.toFixed(3)} obs=${r.obstacleCount} leak=${r.leakPx.toFixed(0)}${r.trusted ? "" : ` !${r.reasons.join(",")}`}`);
+                    console.warn(`    ${r.id}${flag} frame=${r.frame} crossed=${r.isCrossed} ${r.placement} clearance=${r.clearancePx.toFixed(1)}px@t=${r.clearanceT.toFixed(2)} bow=${r.bowPx.toFixed(1)}px r=${r.bowRatio.toFixed(3)} obs=${r.obstacleCount} x=${r.crossingCount}↓${r.passBelowCount} leak=${r.leakPx.toFixed(0)}${r.trusted ? "" : ` !${r.reasons.join(",")}`}`);
                 }
             });
 
