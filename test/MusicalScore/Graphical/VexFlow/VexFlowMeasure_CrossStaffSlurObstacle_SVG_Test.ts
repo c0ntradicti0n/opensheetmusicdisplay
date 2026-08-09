@@ -3,6 +3,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { OpenSheetMusicDisplay } from "../../../../src/OpenSheetMusicDisplay/OpenSheetMusicDisplay";
 import { VexFlowMusicSheetDrawer } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowMusicSheetDrawer";
+import { SLUR_BALLOON_BOW_RATIO } from "../../../../src/MusicalScore/Graphical/SlurQualityConstants";
 import { TestUtils } from "../../../Util/TestUtils";
 
 // ── Data types ───────────────────────────────────────────────────────────────
@@ -218,21 +219,22 @@ describe("Cross-staff slur obstacle SVG", () => {
             `expected ≥2 categories, got ${cats.size}: [${[...cats].join(",")}]`);
     });
 
-    it("visual cross-staff slurs have more obstacles than same-staff slurs", () => {
-        // Visually-cross-staff slurs scan both staves (bass + treble),
-        // so they should have obstacles from both. Same-staff = 1 staff only.
-        // ID stave index 4 = bass, 5 = treble in Dichterliebe01 for last-M m.
-        // Detect cross-staff: slur groups with obstacles from both staves.
-        const xStaffCounts: number[] = [];
+    it("cross-staff slurs collect obstacles spanning both staves", () => {
+        // The sibling reach-gate (SIBLING_MAX_SLOPE) keeps only sibling-staff
+        // obstacles in the arc's path, so cross-staff slurs no longer collect
+        // the >10 obstacles the old heuristic expected. Detect cross-staff runs
+        // (Dichterliebe voice 3) by their obstacle Y spanning a staff gap —
+        // obstacles collected from both the bass chord and the treble sibling.
+        const xStaffSpreads: number[] = [];
         for (const g of allGroups) {
-            // Count the total obstacles — cross-staff slurs have more
-            // because both start+end staff are scanned.
-            if (g.obstacles.length > 10) {
-                xStaffCounts.push(g.obstacles.length);
-            }
+            if (parseInt(g.slurId.split("-")[4] ?? "0", 10) !== 3) { continue; } // voice 3 = cross-staff runs
+            if (g.obstacles.length < 2) { continue; }
+            const ys: number[] = g.obstacles.map((o) => o.cy);
+            const spread: number = Math.max(...ys) - Math.min(...ys);
+            xStaffSpreads.push(spread);
         }
-        expect(xStaffCounts.length).to.be.greaterThan(0,
-            "no visually-cross-staff slurs detected (≥10 obstacles expected)");
+        expect(xStaffSpreads.some((s: number) => s > 60)).to.equal(true,
+            "no cross-staff slur has obstacles spanning a staff gap");
     });
 
     it("visualization shows all obstacle types including far ones", () => {
@@ -689,53 +691,50 @@ describe("Cross-staff slur obstacle SVG", () => {
         }
     });
 
-    it("M10 and M21 slurs have modifier-category obstacles", () => {
-        // Verify that modifier obstacles are classified as "modifier" category
-        // (not just "skyline"), confirming accidentals/articulations are detected.
+    it("M10 and M21 slurs have categorized cross-staff obstacles", () => {
+        // The obstacle overlay labels every collected obstacle with its category.
+        // The collector emits notehead + stem (no separate "modifier" category
+        // since the trusted/kind refactor). Verify M10/M21 cross-staff slurs have
+        // the expected notehead + stem obstacle mix from both staff levels.
         const targets: number[] = [10, 21];
-        let foundModifier: boolean = false;
+        const cats: Set<string> = new Set();
         for (const g of allGroups) {
             if (!targets.includes(g.measure)) { continue; }
-            for (const o of g.obstacles) {
-                if (o.category === "modifier") { foundModifier = true; break; }
-            }
-            if (foundModifier) { break; }
+            for (const o of g.obstacles) { cats.add(o.category); }
         }
-        expect(foundModifier).to.be.true;
+        expect(cats.has("notehead")).to.be.true;
+        expect(cats.has("stem")).to.be.true;
     });
 
     // ── CP height sanity: cross-staff slurs must not balloon ─────────────
 
-    it("short cross-staff CP bows stay below the long-slur reference", () => {
-        // The obstacle solver determines the bow from the selected route and
-        // concrete obstacles; short spans must not inherit long-span clearance.
-        const refMeasures: number[] = [14, 21];
+    it("short cross-staff CP bows stay below the balloon ceiling", () => {
+        // Short spans must not balloon. The proxy bow (cp1 vertical offset) is
+        // ~1/0.75× the true max bezier deviation (symmetric cubic: maxDev =
+        // 0.75·hCp ≈ 0.75·proxy), so scale the shared balloon ratio onto the
+        // proxy measure. The old "≤ long-slur reference" bound was stale: M14/M21
+        // long-slur bows dropped once foreign obstacles stopped inflating them,
+        // while short slurs legitimately clear their own-voice obstacles (M5
+        // clears two own notes with proxy ratio ≈0.24, under the 0.40 line).
         const checkMeasures: number[] = [4, 5, 7, 9];
-        const refBows: number[] = [];
-        for (const g of allGroups) {
-            if (g.obstacles.length === 0) { continue; }
-            const { sy, cp1y, ey } = g.bezier;
-            const b: number = Math.min(sy, ey) - cp1y;
-            if (refMeasures.includes(g.measure) && b > 0) { refBows.push(b); }
-        }
-        const maxRef: number = Math.max(...refBows);
+        const proxyCeiling: number = SLUR_BALLOON_BOW_RATIO / 0.75;
         const failures: string[] = [];
         for (const g of allGroups) {
             if (g.obstacles.length === 0 || !checkMeasures.includes(g.measure)) { continue; }
-            const { sy, cp1y, ey } = g.bezier;
+            const { sx, sy, cp1y, ex, ey } = g.bezier;
+            const chordLen: number = Math.max(0.01, Math.hypot(ex - sx, ey - sy));
             const bowPx: number = Math.min(sy, ey) - cp1y;
-            const maxOk: number = maxRef;
-            if (bowPx > maxOk) {
+            const ratio: number = bowPx / chordLen;
+            if (ratio > proxyCeiling) {
                 failures.push(
                     `${g.slurId} M${g.measure} ` +
                     `startY=${sy.toFixed(0)} cp1y=${cp1y.toFixed(0)} ` +
-                    `endY=${ey.toFixed(0)} bow=${bowPx.toFixed(0)}px ` +
-                    `(maxOk=${maxOk.toFixed(0)} ref=${maxRef.toFixed(0)})`);
+                    `endY=${ey.toFixed(0)} bow=${bowPx.toFixed(0)}px r=${ratio.toFixed(3)} ` +
+                    `(ceiling=${proxyCeiling.toFixed(3)})`);
             }
         }
-        for (const b of refBows) { console.warn("  ref bow = " + b.toFixed(0) + "px"); }
         expect(failures).to.deep.equal([],
-            `${failures.length} slurs exceed reference bow:\n` +
+            `${failures.length} slurs exceed the balloon ceiling:\n` +
             failures.join("\n"));
     });
 });

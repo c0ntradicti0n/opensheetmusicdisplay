@@ -14,15 +14,24 @@ import { SlurLiftObstacle } from "./SlurLiftSolver";
  *  Dichterliebe far-staff notes ~0.6–1.3. */
 export const SIBLING_MAX_SLOPE: number = 0.45;
 
+/** Max notehead-body band used for crossing detection (px). Chords' union
+ *  bounds are larger than any single notehead, so the band is capped. */
+export const NOTEHEAD_BAND_MAX_PX: number = 12;
+
 /** An obstacle in the rendered SVG-pixel frame plus provenance metadata. */
 export interface SlurObstacle extends SlurLiftObstacle {
     kind: "notehead" | "stem";
     /** false = Y reconstructed from the OSMD model (sibling staff not yet drawn). */
     trusted: boolean;
-    /** True when the note belongs to the slur's own voice (the melodic line the
-     *  slur connects). The arc follows the contour of these — they are in its path
-     *  by definition — and they are never filtered by the sibling-reach gate. */
-    ownVoice: boolean;
+    /** Notehead body height in screen px (slur-side edge → far edge). 0 for
+     *  point obstacles (stems, model-reconstructed). */
+    bandPx: number;
+    /** True = the note belongs to the slur's own voice (the melodic line the slur
+     *  connects) — the arc follows its contour and it is never filtered by the
+     *  sibling-reach gate. false = foreign obstacle: the arc must only avoid
+     *  crossing it, never balloon over it. undefined = voice unknown: treated as
+     *  own (historical all-own behavior, grace notes / missing voice). */
+    ownVoice?: boolean;
 }
 
 export interface CollectContext {
@@ -59,7 +68,7 @@ function chordT(x: number, y: number, ctx: CollectContext): number {
 
 /** Read one VF note's obstacle point (notehead top/bottom + slur-side stem tip). */
 function noteObstaclesTrusted(
-    vfNote: VF.StemmableNote, ownVoice: boolean, ctx: CollectContext, out: SlurObstacle[],
+    vfNote: VF.StemmableNote, ownVoice: boolean | undefined, ctx: CollectContext, out: SlurObstacle[],
 ): void {
     const anyNote: any = vfNote as any;
     if (vfNote.isRest?.()) { return; } // rests don't need slur clearance
@@ -68,8 +77,9 @@ function noteObstaclesTrusted(
     const cx: number = vfNote.getAbsoluteX() + vfNote.getGlyphWidth() / 2;
     if (cx < Math.min(ctx.startXPx, ctx.endXPx) || cx > Math.max(ctx.startXPx, ctx.endXPx)) { return; }
 
+    const bandPx: number = Math.min(bounds.yBottom - bounds.yTop, NOTEHEAD_BAND_MAX_PX);
     const headY: number = ctx.above ? bounds.yTop : bounds.yBottom;
-    push(cx, headY, "notehead", true, ownVoice, ctx, out);
+    push(cx, headY, "notehead", true, ownVoice, bandPx, ctx, out);
 
     // Stem tip only when the stem points toward the slur side.
     const dir: number = vfNote.getStemDirection?.() ?? 0;
@@ -78,23 +88,23 @@ function noteObstaclesTrusted(
         // getStemExtents().topY is the stem TIP for both directions
         // (innerMostNoteheadY + stemHeight·-stemDirection).
         const ext: { topY: number, baseY: number } = anyNote.getStemExtents();
-        push(cx, ext.topY, "stem", true, ownVoice, ctx, out);
+        push(cx, ext.topY, "stem", true, ownVoice, 0, ctx, out);
     }
 }
 
 function push(
     xPx: number, yPx: number, kind: "notehead" | "stem", trusted: boolean,
-    ownVoice: boolean, ctx: CollectContext, out: SlurObstacle[],
+    ownVoice: boolean | undefined, bandPx: number, ctx: CollectContext, out: SlurObstacle[],
 ): void {
     const t: number = chordT(xPx, yPx, ctx);
     if (t < ctx.minT || t > ctx.maxT) { return; }
-    out.push({ xPx, yPx, kind, trusted, ownVoice });
+    out.push({ xPx, yPx, kind, trusted, ownVoice, bandPx });
 }
 
 /** Walk every VF note on a staffline in the slur's X range, stamping whether the
  *  note belongs to the slur's own voice. */
 function forEachNote(
-    sl: StaffLine, ctx: CollectContext, cb: (vf: VF.StemmableNote, ownVoice: boolean) => void,
+    sl: StaffLine, ctx: CollectContext, cb: (vf: VF.StemmableNote, ownVoice: boolean | undefined) => void,
 ): void {
     for (const gm of sl.Measures) {
         for (const gse of gm.staffEntries) {
@@ -104,7 +114,7 @@ function forEachNote(
                 if (vf) {
                     const voiceId: number | undefined =
                         (gve as VexFlowVoiceEntry).parentVoiceEntry?.ParentVoice?.VoiceId;
-                    cb(vf, ctx.ownVoiceId !== undefined && voiceId === ctx.ownVoiceId);
+                    cb(vf, ctx.ownVoiceId !== undefined ? voiceId === ctx.ownVoiceId : undefined);
                 }
             }
         }
@@ -156,20 +166,22 @@ export function collectSlurObstaclesStaffRelative(ctx: CollectContext): SlurObst
                 if (!stave) { continue; }
                 const voiceId: number | undefined =
                     (gve as VexFlowVoiceEntry).parentVoiceEntry?.ParentVoice?.VoiceId;
-                const ownVoice: boolean = ctx.ownVoiceId !== undefined && voiceId === ctx.ownVoiceId;
+                const ownVoice: boolean | undefined =
+                    ctx.ownVoiceId !== undefined ? voiceId === ctx.ownVoiceId : undefined;
                 const bounds: { yTop: number, yBottom: number } = anyNote.getNoteHeadBounds();
+                const bandPx: number = Math.min(bounds.yBottom - bounds.yTop, NOTEHEAD_BAND_MAX_PX);
                 const x: number = vf.getAbsoluteX() + vf.getGlyphWidth() / 2 - stave.getX() + mRelX * unitInPixels;
                 if (x < Math.min(ctx.startXPx, ctx.endXPx) || x > Math.max(ctx.startXPx, ctx.endXPx)) { continue; }
 
                 const headY: number = ctx.above ? bounds.yTop : bounds.yBottom;
-                push(x, headY - stave.getY(), "notehead", false, ownVoice, ctx, out);
+                push(x, headY - stave.getY(), "notehead", false, ownVoice, bandPx, ctx, out);
 
                 // Stem tip only when the stem points toward the slur side.
                 const dir: number = vf.getStemDirection?.() ?? 0;
                 const towardSlur: boolean = (ctx.above && dir === 1) || (!ctx.above && dir === -1);
                 if (towardSlur && anyNote.getStemExtents) {
                     const ext: { topY: number, baseY: number } = anyNote.getStemExtents();
-                    push(x, ext.topY - stave.getY(), "stem", false, ownVoice, ctx, out);
+                    push(x, ext.topY - stave.getY(), "stem", false, ownVoice, 0, ctx, out);
                 }
             }
         }
@@ -270,8 +282,9 @@ function collectModelObstacles(sib: StaffLine, ctx: CollectContext, out: SlurObs
                 const yPx: number = (yBase + (ctx.above ? borderTop : borderBottom)) * unitInPixels;
                 const voiceId: number | undefined =
                     (gve as VexFlowVoiceEntry).parentVoiceEntry?.ParentVoice?.VoiceId;
-                const ownVoice: boolean = ctx.ownVoiceId !== undefined && voiceId === ctx.ownVoiceId;
-                push(noteXPx, yPx, "notehead", false, ownVoice, ctx, out);
+                const ownVoice: boolean | undefined =
+                    ctx.ownVoiceId !== undefined ? voiceId === ctx.ownVoiceId : undefined;
+                push(noteXPx, yPx, "notehead", false, ownVoice, 0, ctx, out);
             }
         }
     }

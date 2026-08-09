@@ -4,6 +4,15 @@ import { PointF2D } from "../../../Common/DataObjects/PointF2D";
 export interface SlurLiftObstacle {
     xPx: number;
     yPx: number;
+    /** False = FOREIGN obstacle (not in the slur's voice): the curve must only
+     *  avoid crossing it, never balloon over it. undefined/true = own-voice —
+     *  the slur's melodic line, always cleared (default keeps callers that don't
+     *  know the voice on the historical all-own path). */
+    ownVoice?: boolean;
+    /** Notehead body height in screen px (slur-side edge → far edge), used to
+     *  decide whether a foreign obstacle is actually crossed. 0 for point
+     *  obstacles (stems, model-reconstructed). */
+    bandPx?: number;
 }
 
 /** Tunable levers for the lift solver (sourced from GraphicalSlur statics). */
@@ -94,30 +103,65 @@ export function solveSlurLift(
         cpX * Math.tan(opts.tangentAngleDeg * DEG_TO_RAD) * opts.d,
     );
 
-    // ── Clearance requirement over in-window, slur-side obstacles. ─────────────
-    let clearHCp: number = 0;
-    let maxObstacleH: number = 0;
-    for (const o of obstacles) {
+    // ── Obstacle classes. Own-voice obstacles (the slur's melodic line) are
+    //    always cleared — the arc follows their contour. FOREIGN obstacles are
+    //    only avoided: the curve passes below/above them rather than bowing over
+    //    them, which is what ballooned the control points. ─────────────────────
+    const own: SlurLiftObstacle[] = obstacles.filter((o: SlurLiftObstacle): boolean => o.ownVoice !== false);
+    const foreign: SlurLiftObstacle[] = obstacles.filter((o: SlurLiftObstacle): boolean => o.ownVoice === false);
+
+    // ── Own-voice clearance: the mathematically-minimal CP height that clears
+    //    every in-window own obstacle by margin. ────────────────────────────────
+    let clearHCpOwn: number = 0;
+    let maxObstacleHOwn: number = 0;
+    for (const o of own) {
         const { t, h } = project(o);
         if (t < opts.minT || t > opts.maxT) { continue; }
         if (h <= 0) { continue; } // far side of the chord — not an obstacle
-        if (h > maxObstacleH) { maxObstacleH = h; }
+        if (h > maxObstacleHOwn) { maxObstacleHOwn = h; }
         const needed: number = (h + opts.marginPx) / (3 * t * (1 - t));
-        if (needed > clearHCp) { clearHCp = needed; }
+        if (needed > clearHCpOwn) { clearHCpOwn = needed; }
     }
 
-    let hCp: number = Math.max(naturalHCp, clearHCp);
+    let hCp: number = Math.max(naturalHCp, clearHCpOwn);
 
-    // ── Anti-balloon caps. A cap may only trim EXCESS above the true clearance
-    //    requirement (clearHCp) — never below it, or the curve grazes the
-    //    obstacle. clearHCp is the mathematically-minimal CP height that clears
-    //    every in-window obstacle by margin. ────────────────────────────────────
-    const clearFloor: number = clearHCp;
-    // Cap 1: CP no higher than the tallest obstacle plus a fixed band. Stops the
-    // natural bow (which grows with chord length) from ballooning over a low
-    // obstacle set, but yields to clearFloor when a near-edge obstacle needs more.
-    if (maxObstacleH > 0) {
-        const cpCap: number = Math.max(clearFloor, maxObstacleH + opts.marginPx + opts.slackPx);
+    // ── Foreign obstacles: only avoid crossing. A foreign obstacle forces a lift
+    //    only when the current curve actually enters its notehead band; when the
+    //    curve already passes below/above the body, it is fine untouched. Lifting
+    //    for one obstacle can raise the curve into another's band, so iterate to a
+    //    fixpoint — each foreign obstacle activates at most once and hCp is
+    //    monotone ↑ and bounded, so this terminates. bandPx 0 (point obstacles)
+    //    means any `B < h` grazes the point and forces a lift. ──────────────────
+    const bandScale: number = Math.abs(ux);
+    const foreignRounds: number = foreign.length + 2;
+    for (let round: number = 0; round < foreignRounds; round++) {
+        let changed: boolean = false;
+        for (const o of foreign) {
+            const { t, h } = project(o);
+            if (t < opts.minT || t > opts.maxT) { continue; }
+            if (h <= 0) { continue; } // far side of the chord — not an obstacle
+            const b: number = 3 * t * (1 - t) * hCp; // current curve height at t
+            if (b >= h + opts.marginPx) { continue; } // already clear above
+            const band: number = (o.bandPx ?? 0) * bandScale;
+            if (b < h - band) { continue; } // passes below the notehead body — fine
+            const needed: number = (h + opts.marginPx) / (3 * t * (1 - t)); // crossing/grazing → lift over
+            if (needed > hCp) { hCp = needed; changed = true; }
+        }
+        if (!changed) { break; }
+    }
+
+    // ── Anti-balloon caps. A cap may only trim EXCESS above the OWN-voice
+    //    clearance requirement — never below it, or the curve grazes an own note.
+    //    Foreign-driven lifts are NOT protected by the floor, so a cap can trim
+    //    them; if that lands the curve inside a foreign band it crosses that
+    //    foreign note rather than ballooning (documented trade-off). ───────────
+    const clearFloor: number = clearHCpOwn;
+    // Cap 1: CP no higher than the tallest own obstacle plus a fixed band. Stops
+    // the natural bow (which grows with chord length) from ballooning over a low
+    // own obstacle set, but yields to clearFloor when a near-edge obstacle needs
+    // more.
+    if (maxObstacleHOwn > 0) {
+        const cpCap: number = Math.max(clearFloor, maxObstacleHOwn + opts.marginPx + opts.slackPx);
         if (hCp > cpCap) { hCp = cpCap; }
     }
     // Cap 2: absolute ceiling relative to chord length; also yields to clearFloor.

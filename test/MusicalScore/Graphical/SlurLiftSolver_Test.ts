@@ -93,6 +93,56 @@ describe("SlurLiftSolver", () => {
         expect(apexPerp(start, steepEnd, r, true)).lessThan(0.5 * len + 1);
     });
 
+    it("foreign obstacle far above the natural bow → no lift (curve passes below)", () => {
+        // The Dichterliebe case: a foreign treble notehead projects onto a
+        // cross-staff bass slur; the curve must pass BELOW it, not bow over it.
+        const bare = solveSlurLift(start, end, [], BASE);
+        const r = solveSlurLift(start, end, [{ xPx: 50, yPx: -52, ownVoice: false, bandPx: 8 }], BASE);
+        expect(Math.abs(r.bowPx - bare.bowPx)).lessThan(0.01);
+    });
+
+    it("two-note slur with no own obstacles → tall foreign obstacle causes no balloon", () => {
+        // Historical behavior ballooned here: the foreign h=300 demanded hCp≈305.
+        const r = solveSlurLift(start, end, [{ xPx: 50, yPx: -300, ownVoice: false, bandPx: 8 }], BASE);
+        expect(r.bowPx).lessThan(10); // stays at the natural bow, not 0.75·(300+5)/0.75
+    });
+
+    it("foreign obstacle in the curve's path → lifted to clear, bounded (no balloon)", () => {
+        const r = solveSlurLift(start, end, [{ xPx: 50, yPx: -10, ownVoice: false, bandPx: 8 }], BASE);
+        const apex = apexPerp(start, end, r, true);
+        expect(apex).greaterThanOrEqual(15); // clears 10 by the 5px margin
+        expect(apex).lessThan(16);           // hCp=20, no amplification beyond the crossing lift
+    });
+
+    it("unknown-voice obstacle (ownVoice omitted) → all-own historical behavior", () => {
+        const known = solveSlurLift(start, end, [{ xPx: 50, yPx: -20, ownVoice: true }], BASE);
+        const unknown = solveSlurLift(start, end, [{ xPx: 50, yPx: -20 }], BASE);
+        expect(unknown.bowPx).closeTo(known.bowPx, 1e-9);
+        expect(apexPerp(start, end, unknown, true)).greaterThan(20); // still cleared
+    });
+
+    it("own obstacle clears even when a taller foreign obstacle is ignored", () => {
+        const r = solveSlurLift(start, end, [
+            { xPx: 50, yPx: -20, ownVoice: true },
+            { xPx: 50, yPx: -60, ownVoice: false, bandPx: 8 },
+        ], BASE);
+        const apex = apexPerp(start, end, r, true);
+        expect(apex).greaterThanOrEqual(25); // clears own 20 by the 5px margin
+        expect(apex).lessThan(40);           // NOT lifted toward the foreign 60
+    });
+
+    it("foreign fixpoint: lifting for one obstacle clears a second stacked above it", () => {
+        // Lower foreign note forces hCp=20; raising the curve into the upper note's
+        // band must then lift again until both are clear.
+        const r = solveSlurLift(start, end, [
+            { xPx: 50, yPx: -10, ownVoice: false, bandPx: 8 },
+            { xPx: 50, yPx: -20, ownVoice: false, bandPx: 8 },
+        ], BASE);
+        const apex = apexPerp(start, end, r, true);
+        expect(apex).greaterThanOrEqual(25); // clears the upper (20) by the 5px margin
+        expect(apex).lessThan(26);
+    });
+
     it("translation-invariant: shifting all inputs yields the same local curve", () => {
         // The layout-time reservation (staff-relative frame) and the draw-time
         // solve (absolute frame) must produce the identical local bezier for the
