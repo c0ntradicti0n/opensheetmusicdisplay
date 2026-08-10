@@ -10,6 +10,7 @@ export class Slur {
     private startNote: Note;
     private endNote: Note;
     public PlacementXml: PlacementEnum; // how the slur is placed in the XML
+    public SlurNumber: number = 1; // MusicXML slur number attribute
 
     public get StartNote(): Note {
         return this.startNote;

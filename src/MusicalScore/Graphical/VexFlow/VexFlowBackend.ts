@@ -107,7 +107,7 @@ public abstract getContext(): VF.RenderContext;
 
   public abstract renderLine(start: PointF2D, stop: PointF2D, color: string, lineWidth: number, id?: string): Node;
 
-  public abstract renderCurve(points: PointF2D[], isSlur?: boolean, startNote?: VexFlowGraphicalNote): Node;
+  public abstract renderCurve(points: PointF2D[], isSlur?: boolean, startNote?: VexFlowGraphicalNote, slurNumber?: number): Node;
 
   public abstract renderPath(points: PointF2D[], fill: boolean, id?: string, color?: string): Node;
 

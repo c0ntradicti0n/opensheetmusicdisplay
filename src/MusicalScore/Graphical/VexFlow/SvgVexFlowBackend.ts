@@ -190,14 +190,16 @@ export class SvgVexFlowBackend extends VexFlowBackend {
         return node;
     }
 
-    public renderCurve(points: PointF2D[], isSlur?: boolean, startNote?: VexFlowGraphicalNote): Node {
+    public renderCurve(points: PointF2D[], isSlur?: boolean, startNote?: VexFlowGraphicalNote, slurNumber?: number): Node {
         let slurId: string = undefined;
         if (isSlur && startNote) {
             slurId = `${startNote.getSVGId()}-slur`;
         }
         const node: Node = this.ctx.openGroup("curve", slurId);
         if (isSlur && startNote) {
-            (node as Element).setAttribute("data-slur-id", `${startNote.getSVGId()}-slur`);
+            const xmlNoteId: string = startNote.sourceNote.xmlId || startNote.getSVGId();
+            const num: number = slurNumber ?? 1;
+            (node as Element).setAttribute("data-slur-id", `${xmlNoteId}-slur-${num}`);
         }
         this.ctx.beginPath();
         this.ctx.moveTo(points[0].x, points[0].y);

@@ -64,6 +64,7 @@ export class SlurReader {
                             if (pendingCrossStaffStop && this.isCrossStaffSlurMatch(currentNote, pendingCrossStaffStop.EndNote)) {
                                 pendingCrossStaffStop.StartNote = currentNote;
                                 pendingCrossStaffStop.PlacementXml = slurPlacementXml;
+                                pendingCrossStaffStop.SlurNumber = slurNumber;
                                 this.linkSlurToNotes(pendingCrossStaffStop);
                             } else {
                                 let slur: Slur = this.openSlurDict[slurNumber];
@@ -73,6 +74,7 @@ export class SlurReader {
                                 }
                                 slur.StartNote = currentNote;
                                 slur.PlacementXml = slurPlacementXml;
+                                slur.SlurNumber = slurNumber;
                             }
                         } else if (type === "stop") {
                             const nodeName: string = slurNode.name;
@@ -105,6 +107,7 @@ export class SlurReader {
                                     // openSlurDict, so it can't disturb normal slurs that reuse this number.
                                     const deferredStop: Slur = new Slur();
                                     deferredStop.EndNote = currentNote;
+                                    deferredStop.SlurNumber = slurNumber;
                                     this.openStopBeforeStartDict[slurNumber] = deferredStop;
                                 }
                             }

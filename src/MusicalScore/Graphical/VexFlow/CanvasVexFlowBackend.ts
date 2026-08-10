@@ -10,6 +10,7 @@ import {VexFlowConverter} from "./VexFlowConverter";
 import {BackendType} from "../../../OpenSheetMusicDisplay/OSMDOptions";
 import {EngravingRules} from "../EngravingRules";
 import {GraphicalMusicPage} from "../GraphicalMusicPage";
+import { VexFlowGraphicalNote } from "./VexFlowGraphicalNote";
 
 export class CanvasVexFlowBackend extends VexFlowBackend {
     private zoom: number;
@@ -151,7 +152,7 @@ export class CanvasVexFlowBackend extends VexFlowBackend {
         return undefined; // can't return svg dom node
     }
 
-    public renderCurve(points: PointF2D[]): Node {
+    public renderCurve(points: PointF2D[], _isSlur?: boolean, _startNote?: VexFlowGraphicalNote, _slurNumber?: number): Node {
         this.ctx.beginPath();
         this.ctx.moveTo(points[0].x, points[0].y);
         this.ctx.bezierCurveTo(

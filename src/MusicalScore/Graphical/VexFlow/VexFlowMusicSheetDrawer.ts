@@ -263,7 +263,7 @@ export class VexFlowMusicSheetDrawer extends MusicSheetDrawer {
         curvePointsInPixels.push(this.applyScreenTransformation(p3));
         curvePointsInPixels.push(this.applyScreenTransformation(p4));
         const startNote: VexFlowGraphicalNote = this.rules.GNote(graphicalSlur.slur.StartNote) as VexFlowGraphicalNote;
-        graphicalSlur.SVGElement = this.backend.renderCurve(curvePointsInPixels, true, startNote);
+        graphicalSlur.SVGElement = this.backend.renderCurve(curvePointsInPixels, true, startNote, graphicalSlur.slur.SlurNumber);
 
         // Debug: draw obstacle points as children of the slur SVG element.
         if ((this.skyLineVisible || VexFlowMusicSheetDrawer.DEBUG_SHOW_SKYLINE) && graphicalSlur.debugSkyPoints.length > 0 && graphicalSlur.SVGElement) {
