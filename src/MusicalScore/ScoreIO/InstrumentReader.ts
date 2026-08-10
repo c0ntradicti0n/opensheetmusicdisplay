@@ -1265,6 +1265,15 @@ export class InstrumentReader {
       const value: AbstractNotationInstruction = this.abstractInstructions[i][1];
       if (value instanceof ClefInstruction) {
         const clefInstruction: ClefInstruction = <ClefInstruction>value;
+        // A pending clef well before the measure end is a mid-measure change whose
+        // staff entry has not been read yet (e.g. the entry follows a <backup> node).
+        // Don't hijack it as an end-of-measure clef — leave it pending so it can be
+        // placed inline once that staff entry is created.
+        const instructionTimestamp: Fraction = this.abstractInstructions[i][2];
+        const duration: Fraction = this.activeRhythm.Rhythm;
+        if (duration.RealValue > 0 && instructionTimestamp.RealValue / duration.RealValue < 0.90) {
+          continue;
+        }
         if (
           (!this.activeClefs[key - 1]) ||
           (clefInstruction.ClefType !== this.activeClefs[key - 1].ClefType || (
