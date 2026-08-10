@@ -153,6 +153,14 @@ export class VexFlowMeasure extends GraphicalMeasure {
         this.vfTies.length = 0;
         this.tieNoteIdMap.clear();
         this.connectors = [];
+        // Reset the absolute-position chain so a re-render doesn't read the previous
+        // render's AbsolutePosition: calculate() only refreshes AbsolutePosition at
+        // its very end (transformRelativeToAbsolutePosition), but the skyline calc
+        // (and positionCrossStaffBeams during it) reads it earlier. Without the
+        // reset, a re-render at a different width positions cross-staff beams from
+        // the stale old layout, inflating the bottomline and blowing up the
+        // inter-staff / inter-system spacing (see issue #82).
+        this.PositionAndShape.calculateAbsolutePositionsRecursiveWithoutTopelement();
         // Clean up instructions
         this.resetLayout();
     }
