@@ -1604,6 +1604,11 @@ export class VexFlowMeasure extends GraphicalMeasure {
                     const sourceNote: Note = noteGroup[0];
                     if (!sourceNote?.ParentStaffEntry) { continue; }
                     if (sourceNote.ParentStaffEntry.ParentStaff === this.ParentStaff) { continue; }
+                    // A rest on the sibling stave must not turn the tuplet into a
+                    // cross-staff one: if the upper stave only holds rests (tuplet
+                    // starts with a rest on the other stave), the auto beam would
+                    // reach into the rest space and slant toward it (issue #83).
+                    if (sourceNote.isRest()) { continue; }
 
                     const vfNote: VF.StemmableNote = this.findVfNoteOnSibling(sourceNote, siblingMeasures);
                     if (vfNote) {
@@ -1619,13 +1624,22 @@ export class VexFlowMeasure extends GraphicalMeasure {
                     }
                 }
 
-                if (!siblingMeasure) { continue; }
+                if (!siblingMeasure) {
+                    // Only rests on the other stave (or nothing beamed there):
+                    // the tuplet is effectively local. Beam the local notes so
+                    // the beam stays on this stave and never reaches into the
+                    // other stave's rest space (issue #83).
+                    this.beamLocalTuplet(localEntries, voiceID);
+                    continue;
+                }
 
                 // Build ordered notes array from osmdTuplet time order
                 const allNotes: VF.StemmableNote[] = [];
                 const seen: Set<VF.StemmableNote> = new Set();
                 for (const noteGroup of osmdTuplet.Notes) {
-                    const vf: VF.StemmableNote = noteToVf.get(noteGroup[0]);
+                    const sourceNote: Note = noteGroup[0];
+                    if (sourceNote.isRest()) { continue; }
+                    const vf: VF.StemmableNote = noteToVf.get(sourceNote);
                     if (!vf || seen.has(vf)) { continue; }
                     seen.add(vf);
                     allNotes.push(vf);
@@ -1672,6 +1686,50 @@ export class VexFlowMeasure extends GraphicalMeasure {
                 }
             }
         }
+    }
+
+    /**
+     * Beam the local notes of a tuplet that has no real cross-staff notes
+     * (only rests on the sibling stave). The beam stays on this stave and
+     * must not reach into the other stave's rest space (issue #83).
+     * @param localEntries the tuplet's voice entries in this measure
+     * @param voiceID voice the tuplet belongs to
+     */
+    private beamLocalTuplet(localEntries: VexFlowVoiceEntry[], voiceID: string): void {
+        const localVf: VF.StemmableNote[] = [];
+        const seen: Set<VF.StemmableNote> = new Set();
+        for (const entry of localEntries) {
+            const src: Note = entry.parentVoiceEntry.Notes[0];
+            // Rests never join a beam — even on the same stave the beam must
+            // not reach into the rest's space (issue #83).
+            if (src.isRest()) { continue; }
+            // Quarter notes or longer have a notehead VexFlow can't beam.
+            if (src.NoteTypeXml >= NoteType.QUARTER) { return; }
+            const vf: VF.StemmableNote = entry.vfStaveNote as StemmableNote;
+            if (vf && !seen.has(vf)) {
+                seen.add(vf);
+                localVf.push(vf);
+            }
+        }
+        if (localVf.length < 2) { return; }
+        // Skip if the notes are already connected by an existing beam (e.g. the
+        // tuplet auto-beam from autoBeamNotes, or a MusicXML beam).
+        const beamArrays: (VF.Beam[] | undefined)[] = [
+            this.vfbeams[voiceID], this.autoVfBeams, this.autoTupletVfBeams,
+        ];
+        for (const beams of beamArrays) {
+            if (!beams) { continue; }
+            for (const b of beams) {
+                const bn: VF.Note[] = b.getNotes();
+                if (bn.length >= localVf.length && localVf.every((n) => bn.indexOf(n) >= 0)) {
+                    for (const n of localVf) { (n as StaveNote).setBeam(b); }
+                    return;
+                }
+            }
+        }
+        const beam: VF.Beam = new VF.Beam(localVf as StaveNote[], false);
+        this.autoTupletVfBeams.push(beam);
+        for (const n of localVf) { (n as StaveNote).setBeam(beam); }
     }
 
     private findVfNoteOnSibling(sourceNote: Note, siblingMeasures: VexFlowMeasure[]): VF.StemmableNote {
@@ -1727,6 +1785,9 @@ export class VexFlowMeasure extends GraphicalMeasure {
                     if (noteToVf.has(note)) { continue; }
                     if (!note.ParentStaffEntry) { continue; }
                     if (note.ParentStaffEntry.ParentStaff === this.ParentStaff) { continue; }
+                    // Never treat a rest as the cross-staff sibling of a beam
+                    // (issue #83): beams must not reach into the rest space.
+                    if (note.isRest()) { continue; }
                     const vfNote: VF.StemmableNote = this.findVfNoteOnSibling(note, siblingMeasures);
                     if (vfNote) {
                         noteToVf.set(note, vfNote);
