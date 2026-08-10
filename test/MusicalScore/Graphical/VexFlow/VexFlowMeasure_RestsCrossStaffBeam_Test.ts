@@ -19,6 +19,18 @@ function loadScore(path: string): { gms: GraphicalMusicSheet, calc: VexFlowMusic
     return { gms, calc };
 }
 
+/**
+ * Voice-1 beams that would be drawn for a measure: explicit MusicXML beams
+ * (vfbeams) plus the auto-tuplet fallback. The rest-led tuplet chords carry
+ * their <beam> tags on the chord partner notes, so since the reader honors
+ * those, the beams land in vfbeams[1] (the auto-tuplet fallback only kicks in
+ * for notes that no explicit beam covers).
+ */
+function voice1DrawnBeams(m: VexFlowMeasure): VF.Beam[] {
+    const mAny: any = m as any;
+    return [...(mAny.vfbeams[1] || []), ...(mAny.autoTupletVfBeams || [])];
+}
+
 describe("VexFlow Measure - Rests in cross-staff tuplets (issue #83)", () => {
 
     let bassM78: VexFlowMeasure;
@@ -34,7 +46,7 @@ describe("VexFlow Measure - Rests in cross-staff tuplets (issue #83)", () => {
 
     it("the rest-led tuplets still get beamed over their two chords", () => {
         for (const measure of [bassM78, bassM79]) {
-            const beams: VF.Beam[] = (measure as any).autoTupletVfBeams;
+            const beams: VF.Beam[] = voice1DrawnBeams(measure);
             expect(beams.length).to.equal(2, "2 tuplets per measure = 2 beams");
             for (let i: number = 0; i < beams.length; i++) {
                 const notes: VF.Note[] = beams[i].getNotes();
@@ -81,8 +93,7 @@ describe("VexFlow Measure - Rests in cross-staff tuplets (issue #83)", () => {
         const { gms } = loadScore(".issue83-rests-cross-stave-beams.musicxml");
         for (const measureIdx of [5, 6]) {
             const treble: VexFlowMeasure = gms.MeasureList[measureIdx][0] as VexFlowMeasure;
-            const mAny: any = treble as any;
-            const beams: VF.Beam[] = mAny.autoTupletVfBeams;
+            const beams: VF.Beam[] = voice1DrawnBeams(treble);
             expect(beams.length).to.equal(2, `measure ${measureIdx + 1} should have 2 beams`);
             for (const beam of beams) {
                 const notes: VF.Note[] = beam.getNotes();
