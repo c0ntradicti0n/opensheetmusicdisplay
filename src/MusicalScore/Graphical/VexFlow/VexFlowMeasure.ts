@@ -1528,6 +1528,10 @@ export class VexFlowMeasure extends GraphicalMeasure {
                 if (!vftuplets) {
                     vftuplets = this.vftuplets[voiceID] = [];
                 }
+                // For TupletBracketsIfRepeatedOnlyFirst: track the previous tuplet of this
+                // voice so a run of consecutive identical tuplets only brackets its first.
+                let previousTuplet: Tuplet = undefined;
+                let previousTupletBracketed: boolean = false;
                 for (const tupletBuilder of this.tuplets[voiceID]) {
                     const tupletStaveNotes: VF.StaveNote[] = [];
                     const tupletVoiceEntries: VexFlowVoiceEntry[] = tupletBuilder[1];
@@ -1544,6 +1548,13 @@ export class VexFlowMeasure extends GraphicalMeasure {
                         this.isTabMeasure,
                         this.rules.TabTupletsBracketed
                       );
+                      let effectiveBracketed: boolean = bracketed;
+                      if (bracketed && this.rules.TupletBracketsIfRepeatedOnlyFirst &&
+                          previousTupletBracketed && this.isTupletRepeatOfPrevious(previousTuplet, tuplet)) {
+                          // Gould: in a run of consecutive identical tuplets only the first
+                          // gets a bracket; repeats keep their tuplet number, just no bracket.
+                          effectiveBracketed = false;
+                      }
                       let location: number = VF.Tuplet.LOCATION_TOP;
                       if (tuplet.tupletLabelNumberPlacement === PlacementEnum.Below) {
                           location = VF.Tuplet.LOCATION_BOTTOM;
@@ -1561,7 +1572,7 @@ export class VexFlowMeasure extends GraphicalMeasure {
                       }
                       const vftuplet: VF.Tuplet = new VF.Tuplet(tupletStaveNotes,
                         {
-                          bracketed: bracketed,
+                          bracketed: effectiveBracketed,
                           location: location,
                           notesOccupied: notesOccupied,
                           numNotes: tuplet.TupletLabelNumber, //, location: -1, ratioed: true
@@ -1570,12 +1581,45 @@ export class VexFlowMeasure extends GraphicalMeasure {
                         });
                       vftuplets.push(vftuplet);
                       this.osmdTupletToVfTuplet.set(tuplet, vftuplet);
+                      previousTuplet = tuplet;
+                      previousTupletBracketed = bracketed;
                     } else {
                         log.debug("Warning! Tuplet with no notes! Trying to ignore, but this is a serious problem.");
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Whether the current tuplet directly repeats the previous one (same tuplet kind,
+     * same written note duration, same bracket placement, and no gap between the two
+     * groups). Such a pair opens or continues a "run" of consecutive identical tuplets.
+     * The run is scoped to this measure: finalizeTuplets resets the previous-tuplet
+     * state per measure, so each measure (and each system) starts a new run.
+     */
+    private isTupletRepeatOfPrevious(previous: Tuplet, current: Tuplet): boolean {
+        if (!previous) {
+            return false;
+        }
+        if (previous.TupletLabelNumber !== current.TupletLabelNumber) {
+            return false;
+        }
+        if (previous.tupletLabelNumberPlacement !== current.tupletLabelNumberPlacement) {
+            return false;
+        }
+        const previousDuration: Fraction = previous.Fractions[0];
+        const currentDuration: Fraction = current.Fractions[0];
+        if (!previousDuration || !currentDuration || !previousDuration.Equals(currentDuration)) {
+            return false;
+        }
+        const previousLastNote: Note = previous.Notes[previous.Notes.length - 1]?.[0];
+        const currentFirstNote: Note = current.Notes[0]?.[0];
+        if (!previousLastNote || !currentFirstNote) {
+            return false;
+        }
+        const previousEnd: Fraction = Fraction.plus(previousLastNote.ParentVoiceEntry.Timestamp, previousLastNote.Length);
+        return previousEnd.Equals(currentFirstNote.ParentVoiceEntry.Timestamp);
     }
 
     public fixCrossStaffTuplets(siblingMeasures: VexFlowMeasure[]): void {

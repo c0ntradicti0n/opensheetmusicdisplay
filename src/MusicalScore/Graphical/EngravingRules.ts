@@ -218,6 +218,14 @@ export class EngravingRules {
     public TupletNumberAlwaysDisableAfterFirstMax: boolean;
     /** Whether to use the <tuplet show-number="value"> value or to ignore it. */
     public TupletNumberUseShowNoneXMLValue: boolean;
+    /** Whether, in a run of consecutive identical tuplets (same tuplet kind, same note
+     * duration, same placement, no notes between them) within a measure, only the first
+     * tuplet renders a bracket. Repeated tuplets in the run still show their tuplet number,
+     * just no bracket. Gould: when tuplets of the same kind follow in succession, brackets
+     * may be omitted except on the first. The run is evaluated per measure: a new measure
+     * (or system) starts a new run and brackets its first tuplet again. Default false
+     * (bracket every tuplet that requests one). */
+    public TupletBracketsIfRepeatedOnlyFirst: boolean;
     public LabelMarginBorderFactor: number;
     public TupletVerticalLineLength: number;
     /** Whether to show tuplet numbers (and brackets) in tabs. Brackets can be disabled via TabTupletsBracketed. */
@@ -826,6 +834,7 @@ export class EngravingRules {
         this.TupletNumberMaxConsecutiveRepetitions = 2;
         this.TupletNumberAlwaysDisableAfterFirstMax = true;
         this.TupletNumberUseShowNoneXMLValue = true;
+        this.TupletBracketsIfRepeatedOnlyFirst = false;
         this.LabelMarginBorderFactor = 0.1;
         this.TupletVerticalLineLength = 0.5;
         this.TupletNumbersInTabs = true; // disabled by default, nonstandard in tabs, at least how we show them in non-tabs.
