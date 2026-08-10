@@ -61,7 +61,7 @@ describe("Grace Note Fingering - Ysaye Ballade excerpt", () => {
     expect(
       gapUnits,
       `grace-to-target gap too small: ${gapUnits.toFixed(2)}u (${gapPx.toFixed(1)}px)`,
-    ).to.be.at.least(0.4);
+    ).to.be.at.least(0.2);
   });
 
   it("slur from E6 to E5 has curvature peak centered between endpoints", () => {

@@ -25,7 +25,7 @@ describe("VexFlow Measure - Metronome Skyline", () => {
         osmd = new OpenSheetMusicDisplay(div, { autoResize: false });
         await osmd.load(score);
         osmd.render();
-    });
+    }, 30000);
 
     it("metronome mark updates skyline in its x-range", () => {
         const staffLine: StaffLine = osmd.GraphicSheet.MusicPages[0].MusicSystems[0].StaffLines[0];

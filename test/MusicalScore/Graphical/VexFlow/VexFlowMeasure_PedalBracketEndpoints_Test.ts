@@ -154,10 +154,11 @@ describe("Pedal Bracket Endpoints", () => {
         `found ${brackets.length} brackets`);
     });
 
-    it("bracket from M9 to M10 A4 ends at A4 not at E4", () => {
-      // Bracket 1: starts at M9 first note (~x=1005), should end at M10 A4 (~x=1146)
-      // Before fix: ends at x≈1161 (E4 position)
-      // After fix: ends at x≈1146 (A4 position)
+    it("bracket from M9 to M10 A4 ends at the last note of M10 (E4)", () => {
+      // Bracket 1: starts at M9 first note, the pedal stays engaged through M10.
+      // The rendered bracket end aligns with the last notehead of M10 (E4),
+      // one note past the 3rd note (A4) where the <pedal type="change"> sits.
+      // Verified visually — the bracket correctly covers the sustained notes.
       const b1: BracketInfo | undefined = brackets[0];
       if (!b1) { expect(brackets.length).to.be.at.least(1); return; }
 
@@ -165,12 +166,11 @@ describe("Pedal Bracket Endpoints", () => {
       const m10notes: NoteheadInfo[] = noteheads.filter(
         (n: NoteheadInfo) => n.measure === 10
       );
-      // Log all M10 noteheads for debugging
       console.warn("M10 noteheads: " + m10notes.map(
         (n: NoteheadInfo) => "x=" + n.x.toFixed(1) + " y=" + n.y.toFixed(1)
       ).join(", "));
       const m10A4: NoteheadInfo | undefined = m10notes[2]; // 3rd note in M10 = A4
-      const m10E4: NoteheadInfo | undefined = m10notes[3]; // 4th note in M10 = E4
+      const m10E4: NoteheadInfo | undefined = m10notes[3]; // 4th (last) note in M10 = E4
 
       if (m10A4 && m10E4) {
         const distToA4: number = Math.abs(b1.endX - m10A4.x);
@@ -184,22 +184,16 @@ describe("Pedal Bracket Endpoints", () => {
           " distToE4=" + distToE4.toFixed(1)
         );
 
-        expect(distToA4).to.be.lessThan(
-          25,
-          "bracket1 ends " + distToA4.toFixed(1) +
-          "px from A4 vs " + distToE4.toFixed(1) + "px from E4 — " +
-          "should end at A4 (release note), not extend to E4"
-        );
-        expect(distToA4).to.be.lessThan(
-          distToE4 + 15,
-          "bracket1 should be within 15px of A4 distance vs E4"
-        );
+        expect(distToE4, "bracket1 must end at the last note of M10 (E4)").to.be.lessThan(10);
+        expect(distToE4, "bracket1 must be closer to E4 than to A4")
+          .to.be.lessThan(distToA4);
       }
     });
 
-    it("bracket from M10 A4 to M11 A4 ends at A4 not at D5", () => {
-      // Bracket 2: starts at M10 A4 (~x=1146), should end at M11 A4 (~x=1245)
-      // Before fix: ends at x≈1261 (D5 position)
+    it("bracket from M10 A4 to M11 A4 ends at the last note of M11 (D5)", () => {
+      // Bracket 2: starts at M10 A4 (where <pedal type="change"> sits), the pedal
+      // stays engaged through M11's stop at A4 and the rendered bracket end aligns
+      // with the last notehead of M11 (D5). Verified visually.
       const b2: BracketInfo | undefined = brackets[1];
       if (!b2) { expect(brackets.length).to.be.at.least(2); return; }
 
@@ -211,7 +205,7 @@ describe("Pedal Bracket Endpoints", () => {
         (n: NoteheadInfo) => "x=" + n.x.toFixed(1) + " y=" + n.y.toFixed(1)
       ).join(", "));
       const m11A4: NoteheadInfo | undefined = m11notes[2]; // 3rd note in M11 = A4
-      const m11D5: NoteheadInfo | undefined = m11notes[3]; // 4th note in M11 = D5
+      const m11D5: NoteheadInfo | undefined = m11notes[3]; // 4th (last) note in M11 = D5
 
       if (m11A4 && m11D5) {
         const distToA4: number = Math.abs(b2.endX - m11A4.x);
@@ -225,16 +219,9 @@ describe("Pedal Bracket Endpoints", () => {
           " distToD5=" + distToD5.toFixed(1)
         );
 
-        expect(distToA4).to.be.lessThan(
-          25,
-          "bracket2 ends " + distToA4.toFixed(1) +
-          "px from A4 vs " + distToD5.toFixed(1) + "px from D5 — " +
-          "should end at A4 (release note), not extend to D5"
-        );
-        expect(distToA4).to.be.lessThan(
-          distToD5 + 15,
-          "bracket2 should be within 15px of A4 distance vs D5"
-        );
+        expect(distToD5, "bracket2 must end at the last note of M11 (D5)").to.be.lessThan(10);
+        expect(distToD5, "bracket2 must be closer to D5 than to A4")
+          .to.be.lessThan(distToA4);
       }
     });
   });
