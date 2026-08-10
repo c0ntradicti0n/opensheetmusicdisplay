@@ -529,7 +529,7 @@ export class VoiceGenerator {
       this.currentVoiceEntry.StemColor = stemColorXml;
       note.StemColorXml = stemColorXml;
     }
-    if (node.elements("beam") && !chord) {
+    if (node.elements("beam")) {
       this.createBeam(node, note);
     }
     return note;
@@ -632,6 +632,12 @@ export class VoiceGenerator {
         const currentBeamTag: string = mainBeamNode[0].value;
         if (mainBeamNode) {
           if (currentBeamTag === "begin") {
+            // A chord partner note may repeat the stem note's "begin". When the
+            // current VoiceEntry already has a note in the last open beam, the
+            // stem note already started this beam — don't spawn a duplicate.
+            if (this.openBeams.last()?.Notes.some((n) => n.ParentVoiceEntry === this.currentVoiceEntry)) {
+              return;
+            }
             if (beamNumber === this.openBeams.last()?.BeamNumber) {
               // beam with same number already existed (error in XML), bump beam number
               this.beamNumberOffset++;

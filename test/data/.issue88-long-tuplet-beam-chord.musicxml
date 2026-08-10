@@ -1,0 +1,477 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE score-partwise PUBLIC
+  "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+  "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise>
+  <part-list>
+    <score-part id="P1">
+      <part-name>鋼琴</part-name>
+      <part-abbreviation>Pno.</part-abbreviation>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <!--=======================================================-->
+    <measure number="148">
+      <attributes>
+        <staves>2</staves>
+        <divisions>120</divisions>
+        <key>
+          <fifths>-4</fifths>
+        </key>
+        <time>
+          <beats>2</beats>
+          <beat-type>4</beat-type>
+        </time>
+        <clef number="1">
+          <sign>G</sign>
+          <line>2</line>
+        </clef>
+        <clef number="2">
+          <sign>F</sign>
+          <line>4</line>
+        </clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>80</per-minute>
+          </metronome>
+        </direction-type>
+        <sound tempo="80"/>
+      </direction>
+      <direction>
+        <direction-type>
+          <dynamics>
+            <ff/>
+          </dynamics>
+        </direction-type>
+      </direction>
+      <direction>
+        <direction-type>
+          <dynamics>
+            <ff/>
+          </dynamics>
+        </direction-type>
+      </direction>
+      <direction placement="below">
+        <direction-type>
+          <pedal type="start" line="yes"/>
+        </direction-type>
+        <staff>2</staff>
+      </direction>
+      <note default-x="23.09" default-y="-35.00" id="n3361">
+        <pitch>
+          <step>F</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">begin</beam>
+        <beam number="2">begin</beam>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+        <sound dynamics="33.86"/>
+      </note>
+      <note default-x="57.72" default-y="0.00" id="n3367">
+        <pitch>
+          <step>F</step>
+          <octave>5</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <sound dynamics="29.92"/>
+      </note>
+      <note default-x="57.72" default-y="-25.00" id="n3368">
+        <chord/>
+        <pitch>
+          <step>A</step>
+          <alter>-1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <sound dynamics="30.71"/>
+      </note>
+      <note default-x="92.35" default-y="-15.00" id="n3369">
+        <pitch>
+          <step>C</step>
+          <octave>5</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+        <sound dynamics="26.77"/>
+      </note>
+      <note default-x="126.98" default-y="0.00" id="n3370">
+        <pitch>
+          <step>F</step>
+          <octave>5</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+        <sound dynamics="23.62"/>
+      </note>
+      <note default-x="161.61" default-y="35.00" id="n3371">
+        <pitch>
+          <step>F</step>
+          <octave>6</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <sound dynamics="31.50"/>
+      </note>
+      <note default-x="161.61" default-y="10.00" id="n3372">
+        <chord/>
+        <pitch>
+          <step>A</step>
+          <alter>-1</alter>
+          <octave>5</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <sound dynamics="20.47"/>
+      </note>
+      <note default-x="196.24" default-y="20.00" id="n3373">
+        <pitch>
+          <step>C</step>
+          <octave>6</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+        <sound dynamics="18.90"/>
+      </note>
+      <direction placement="above">
+        <direction-type>
+          <octave-shift type="down" size="8" number="1"/>
+        </direction-type>
+        <staff>1</staff>
+      </direction>
+      <note default-x="230.87" default-y="0.00" id="n3374">
+        <pitch>
+          <step>F</step>
+          <octave>6</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <notations>
+          <tuplet number="1" type="start" bracket="yes"/>
+        </notations>
+        <sound dynamics="27.56"/>
+      </note>
+      <note default-x="265.50" default-y="35.00" id="n3377">
+        <pitch>
+          <step>F</step>
+          <octave>7</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <sound dynamics="35.43"/>
+      </note>
+      <note default-x="265.50" default-y="10.00" id="n3378">
+        <chord/>
+        <pitch>
+          <step>A</step>
+          <alter>-1</alter>
+          <octave>6</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <beam number="2">continue</beam>
+        <sound dynamics="29.92"/>
+      </note>
+      <note default-x="300.13" default-y="20.00" id="n3379">
+        <pitch>
+          <step>C</step>
+          <octave>7</octave>
+        </pitch>
+        <duration>20</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>16th</type>
+        <time-modification>
+          <actual-notes>3</actual-notes>
+          <normal-notes>2</normal-notes>
+        </time-modification>
+        <staff>1</staff>
+        <beam number="1">end</beam>
+        <beam number="2">end</beam>
+        <notations>
+          <tuplet number="1" type="stop"/>
+        </notations>
+        <sound dynamics="25.98"/>
+      </note>
+      <direction placement="above">
+        <direction-type>
+          <octave-shift type="stop" size="8" number="1"/>
+        </direction-type>
+        <staff>1</staff>
+      </direction>
+      <note id="r259">
+        <rest/>
+        <duration>60</duration>
+        <voice>1</voice>
+        <type>eighth</type>
+        <staff>1</staff>
+      </note>
+      <direction placement="below">
+        <direction-type>
+          <pedal type="end" line="yes"/>
+        </direction-type>
+        <staff>2</staff>
+      </direction>
+      <backup>
+        <duration>240</duration>
+      </backup>
+      <note default-x="23.09" default-y="-35.00" id="n3362">
+        <pitch>
+          <step>F</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>120</duration>
+        <voice>2</voice>
+        <stem>down</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <sound dynamics="62.99"/>
+      </note>
+      <forward>
+        <duration>90</duration>
+      </forward>
+      <note default-x="381.54" default-y="-35.00" id="n3380">
+        <pitch>
+          <step>F</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>30</duration>
+        <voice>2</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <staff>1</staff>
+        <sound dynamics="15.75"/>
+      </note>
+      <backup>
+        <duration>240</duration>
+      </backup>
+      <note default-x="23.09" default-y="-133.67" id="n3363">
+        <pitch>
+          <step>F</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>120</duration>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>quarter</type>
+        <staff>2</staff>
+        <notations>
+          <articulations>
+            <accent/>
+          </articulations>
+        </notations>
+        <sound dynamics="39.37"/>
+      </note>
+      <note default-x="230.87" default-y="-98.67" id="n3375">
+        <pitch>
+          <step>F</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>90</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <dot/>
+        <staff>2</staff>
+        <sound dynamics="34.65"/>
+      </note>
+      <note default-x="230.87" default-y="-133.67" id="n3376">
+        <chord/>
+        <pitch>
+          <step>F</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>90</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <dot/>
+        <staff>2</staff>
+        <notations>
+          <articulations>
+            <accent/>
+          </articulations>
+        </notations>
+        <sound dynamics="37.80"/>
+      </note>
+      <note default-x="381.54" default-y="-133.67" id="n3381">
+        <pitch>
+          <step>F</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>30</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>16th</type>
+        <staff>2</staff>
+        <notations>
+          <articulations>
+            <accent/>
+          </articulations>
+        </notations>
+        <sound dynamics="17.32"/>
+      </note>
+      <backup>
+        <duration>240</duration>
+      </backup>
+      <note default-x="23.09" default-y="-148.67" id="n3364">
+        <pitch>
+          <step>C</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>60</duration>
+        <voice>6</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <notations>
+          <arpeggiate/>
+        </notations>
+        <sound dynamics="44.88"/>
+      </note>
+      <note default-x="23.09" default-y="-158.67" id="n3365">
+        <chord/>
+        <pitch>
+          <step>A</step>
+          <alter>-1</alter>
+          <octave>2</octave>
+        </pitch>
+        <duration>60</duration>
+        <voice>6</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <notations>
+          <arpeggiate/>
+        </notations>
+        <sound dynamics="18.11"/>
+      </note>
+      <note default-x="23.09" default-y="-168.67" id="n3366">
+        <chord/>
+        <pitch>
+          <step>F</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>60</duration>
+        <voice>6</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <notations>
+          <articulations>
+            <accent/>
+          </articulations>
+          <arpeggiate/>
+        </notations>
+        <sound dynamics="27.56"/>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
