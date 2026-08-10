@@ -8,20 +8,18 @@ import { VexFlowMusicSheetDrawer } from "./../MusicalScore/Graphical/VexFlow/Vex
 import { SvgVexFlowBackend } from "./../MusicalScore/Graphical/VexFlow/SvgVexFlowBackend";
 import { CanvasVexFlowBackend } from "./../MusicalScore/Graphical/VexFlow/CanvasVexFlowBackend";
 import { MusicSheet } from "./../MusicalScore/MusicSheet";
-import { Cursor } from "./Cursor";
 import { MXLFile, MXLHelper } from "../Common/FileIO/Mxl";
 import { AJAX } from "./AJAX";
 import log from "loglevel";
 import { DrawingParameters } from "../MusicalScore/Graphical/DrawingParameters";
 import { DrawingParametersEnum } from "../Common/Enums/DrawingParametersEnum";
 import { ColoringModes } from "../Common/Enums/ColoringModes";
-import { IOSMDOptions, OSMDOptions, AutoBeamOptions, BackendType, CursorOptions, CursorType } from "./OSMDOptions";
+import { IOSMDOptions, OSMDOptions, AutoBeamOptions, BackendType } from "./OSMDOptions";
 import { EngravingRules, PageFormat } from "../MusicalScore/Graphical/EngravingRules";
 import { AbstractExpression } from "../MusicalScore/VoiceData/Expressions/AbstractExpression";
 import { Dictionary } from "typescript-collections";
 import { AutoColorSet } from "../MusicalScore/Graphical/DrawingEnums";
 import { GraphicalMusicPage } from "../MusicalScore/Graphical/GraphicalMusicPage";
-import { MusicPartManagerIterator } from "../MusicalScore/MusicParts/MusicPartManagerIterator";
 import { ITransposeCalculator } from "../MusicalScore/Interfaces/ITransposeCalculator";
 import { NoteEnum } from "../Common/DataObjects/Pitch";
 import { TemposCalculator } from "../MusicalScore/ScoreIO/MusicSymbolModules/TemposCalculator";
@@ -65,15 +63,6 @@ export class OpenSheetMusicDisplay {
         this.setOptions(options);
     }
 
-    /** Options from which OSMD creates cursors in enableOrDisableCursors(). */
-    public cursorsOptions: CursorOptions[] = [];
-    public cursors: Cursor[] = [];
-    public get cursor(): Cursor { // lowercase for backwards compatibility since cursor -> cursors change
-        return this.cursors[0];
-    }
-    public get Cursor(): Cursor {
-        return this.cursor;
-    }
     public zoom: number = 1.0;
     protected zoomUpdated: boolean = false;
     /** Timeout in milliseconds used in osmd.load(string) when string is a URL. */
@@ -92,7 +81,6 @@ export class OpenSheetMusicDisplay {
     protected rules: EngravingRules;
     protected autoResizeEnabled: boolean;
     protected resizeHandlerAttached: boolean;
-    protected followCursor: boolean;
     /** A function that is executed when the XML has been read.
      * The return value will be used as the actual XML OSMD parses,
      * so you can make modifications to the xml that OSMD will use.
@@ -215,11 +203,6 @@ export class OpenSheetMusicDisplay {
     public updateGraphic(): void {
         const calc: MusicSheetCalculator = new VexFlowMusicSheetCalculator(this.rules);
         this.graphic = new GraphicalMusicSheet(this.sheet, calc);
-        if (this.drawingParameters.drawCursors) {
-            this.cursors.forEach(cursor => {
-                cursor.init(this.sheet.MusicPartManager, this.graphic);
-            });
-        }
         if (this.drawingParameters.DrawingParametersEnum === DrawingParametersEnum.leadsheet) {
             this.graphic.LeadSheet = true;
         }
@@ -272,10 +255,6 @@ export class OpenSheetMusicDisplay {
         // Calculate again
         this.graphic.reCalculate();
 
-        if (this.drawingParameters.drawCursors) {
-            this.graphic.Cursors.length = 0;
-        }
-
         // needBackendUpdate is well intentioned, but we need to cover all cases.
         //   backends also need an update when this.zoom was set from outside, which unfortunately doesn't have a setter method to set this in.
         //   so just for compatibility, we need to assume users set osmd.zoom, so we'd need to check whether it was changed compared to last time.
@@ -288,14 +267,6 @@ export class OpenSheetMusicDisplay {
         // Finally, draw
         this.drawer.drawSheet(this.graphic);
 
-        this.enableOrDisableCursors(this.drawingParameters.drawCursors);
-
-        if (this.drawingParameters.drawCursors) {
-            // Update the cursor position
-            this.cursors.forEach(cursor => {
-                cursor.update();
-            });
-        }
         this.zoomUpdated = false;
         this.rules.RenderCount++;
         //console.log("[OSMD] render finished");
@@ -490,11 +461,7 @@ export class OpenSheetMusicDisplay {
         if (options.colorStemsLikeNoteheads !== undefined) {
             this.rules.ColorStemsLikeNoteheads = options.colorStemsLikeNoteheads;
         }
-        if (options.disableCursor) {
-            this.drawingParameters.drawCursors = false;
-        }
 
-        // alternative to if block: this.drawingsParameters.drawCursors = options.drawCursors !== false. No if, but always sets drawingParameters.
         // note that every option can be undefined, which doesn't mean the option should be set to false.
         if (options.drawHiddenNotes) {
             this.drawingParameters.drawHiddenNotes = true; // not yet supported
@@ -569,9 +536,6 @@ export class OpenSheetMusicDisplay {
         }
         if (options.fillEmptyMeasuresWithWholeRest !== undefined) {
             this.rules.FillEmptyMeasuresWithWholeRest = options.fillEmptyMeasuresWithWholeRest;
-        }
-        if (options.followCursor !== undefined) {
-            this.FollowCursor = options.followCursor;
         }
         if (options.setWantedStemDirectionByXml !== undefined) {
             this.rules.SetWantedStemDirectionByXml = options.setWantedStemDirectionByXml;
@@ -665,16 +629,6 @@ export class OpenSheetMusicDisplay {
         if (options.autoGenerateMultipleRestMeasuresFromRestMeasures !== undefined) {
             this.rules.AutoGenerateMultipleRestMeasuresFromRestMeasures = options.autoGenerateMultipleRestMeasuresFromRestMeasures;
         }
-        if (options.cursorsOptions !== undefined) {
-            this.cursorsOptions = options.cursorsOptions;
-        } else {
-            this.cursorsOptions = [{
-                type: CursorType.Standard,
-                color: this.EngravingRules.DefaultColorCursor,
-                alpha: 0.5,
-                follow: true
-            }];
-        }
         if (options.useGeometricSkyBottomLineCalculation !== undefined) {
             this.rules.UseGeometricSkyBottomLineCalculation = options.useGeometricSkyBottomLineCalculation;
         }
@@ -764,11 +718,6 @@ export class OpenSheetMusicDisplay {
      * FIXME: Probably unnecessary
      */
     protected reset(): void {
-        if (this.drawingParameters.drawCursors) {
-            this.cursors.forEach(cursor => {
-                cursor.hide();
-            });
-        }
         this.sheet = undefined;
         this.graphic = undefined;
         this.zoom = 1.0;
@@ -876,51 +825,6 @@ export class OpenSheetMusicDisplay {
         if (renderedBeforeAttach) {
             window.setTimeout(startCallback, 0);
             window.setTimeout(endCallback, 1);
-        }
-    }
-
-    /** Enable or disable (hide) the cursor.
-     * @param enable whether to enable (true) or disable (false) the cursor
-     */
-    public enableOrDisableCursors(enable: boolean): void {
-        this.drawingParameters.drawCursors = enable;
-        if (enable) {
-            for (let i: number = 0; i < this.cursorsOptions.length; i++){
-                // save previous cursor state
-                const hidden: boolean = this.cursors[i]?.Hidden ?? true;
-                const previousIterator: MusicPartManagerIterator = this.cursors[i]?.Iterator;
-                this.cursors[i]?.hide();
-
-                // check which page/backend to draw the cursor on (the pages may have changed since last cursor)
-                let backendToDrawOn: VexFlowBackend = this.drawer?.Backends[0];
-                if (backendToDrawOn && this.rules.RestoreCursorAfterRerender && this.cursors[i]) {
-                    const newPageNumber: number = this.cursors[i].updateCurrentPage();
-                    backendToDrawOn = this.drawer.Backends[newPageNumber - 1];
-                }
-                // create new cursor
-                if (backendToDrawOn && backendToDrawOn.getRenderElement()) {
-                    this.cursors[i] = new Cursor(backendToDrawOn.getRenderElement(), this, this.cursorsOptions[i]);
-                }
-                if (this.sheet && this.graphic && this.cursors[i]) { // else init is called in load()
-                    this.cursors[i].init(this.sheet.MusicPartManager, this.graphic);
-                }
-
-                // restore old cursor state
-                if (this.rules.RestoreCursorAfterRerender) {
-                    this.cursors[i].hidden = hidden;
-                    if (previousIterator) {
-                        this.cursors[i].iterator = previousIterator;
-                        this.cursors[i].update();
-                    }
-                }
-            }
-        } else { // disable cursor
-            this.cursors.forEach(cursor => {
-                cursor.hide();
-            });
-            // this.cursor = undefined;
-            // TODO cursor should be disabled, not just hidden. otherwise user can just call osmd.cursor.hide().
-            // however, this could cause null calls (cursor.next() etc), maybe that needs some solution.
         }
     }
 
@@ -1049,14 +953,6 @@ export class OpenSheetMusicDisplay {
         if (this.graphic?.GetCalculator instanceof VexFlowMusicSheetCalculator) { // null and type check
             (this.graphic.GetCalculator as VexFlowMusicSheetCalculator).beamsNeedUpdate = this.zoomUpdated;
         }
-    }
-
-    public set FollowCursor(value: boolean) {
-        this.followCursor = value;
-    }
-
-    public get FollowCursor(): boolean {
-        return this.followCursor;
     }
 
     public set TransposeCalculator(calculator: ITransposeCalculator) {

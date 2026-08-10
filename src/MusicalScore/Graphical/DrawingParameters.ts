@@ -12,7 +12,6 @@ export class DrawingParameters {
     public drawErrors: boolean;
     public drawSelectionStartSymbol: boolean;
     public drawSelectionEndSymbol: boolean;
-    public drawCursors: boolean = true;
     public drawActivitySymbols: boolean;
     public drawScrollIndicator: boolean;
     public drawComments: boolean;
@@ -71,7 +70,6 @@ export class DrawingParameters {
         this.drawErrors = true;
         this.drawSelectionStartSymbol = true;
         this.drawSelectionEndSymbol = true;
-        this.drawCursors = true;
         this.drawActivitySymbols = true;
         this.drawScrollIndicator = true;
         this.drawComments = true;
@@ -97,7 +95,6 @@ export class DrawingParameters {
         this.drawErrors = false;
         this.drawSelectionStartSymbol = false;
         this.drawSelectionStartSymbol = false;
-        this.drawCursors = false;
         this.drawActivitySymbols = false;
         this.drawScrollIndicator = false;
         this.drawComments = true;
@@ -143,7 +140,6 @@ export class DrawingParameters {
         this.drawErrors = false;
         this.drawSelectionStartSymbol = true;
         this.drawSelectionEndSymbol = true;
-        this.drawCursors = true;
         this.drawActivitySymbols = false;
         this.drawScrollIndicator = true;
         this.drawComments = true;

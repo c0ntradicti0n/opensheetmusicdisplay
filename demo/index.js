@@ -163,12 +163,6 @@ import { TransposeCalculator } from '../src/Plugins/Transpose/TransposeCalculato
         zoomOuts,
         zoomDivs,
         custom,
-        previousCursorBtn,
-        nextCursorBtn,
-        resetCursorBtn,
-        followCursorCheckbox,
-        showCursorBtn,
-        hideCursorBtn,
         debugReRenderBtn,
         debugClearBtn,
         selectPageSizes,
@@ -302,12 +296,6 @@ import { TransposeCalculator } from '../src/Plugins/Transpose/TransposeCalculato
         }
         canvas.id = 'osmdCanvasDiv';
         //canvas.style.overflowX = 'auto'; // enable horizontal scrolling
-        previousCursorBtn = document.getElementById("previous-cursor-btn");
-        nextCursorBtn = document.getElementById("next-cursor-btn");
-        resetCursorBtn = document.getElementById("reset-cursor-btn");
-        followCursorCheckbox = document.getElementById("follow-cursor-checkbox");
-        showCursorBtn = document.getElementById("show-cursor-btn");
-        hideCursorBtn = document.getElementById("hide-cursor-btn");
         debugReRenderBtn = document.getElementById("debug-re-render-btn");
         debugClearBtn = document.getElementById("debug-clear-btn");
         selectPageSizes = [];
@@ -604,8 +592,6 @@ import { TransposeCalculator } from '../src/Plugins/Transpose/TransposeCalculato
             autoResize: true,
             backend: backendType,
             //backend: "canvas",
-            //cursorsOptions: [{type: 3, color: "#2bb8cd", alpha: 0.6, follow: true}], // highlight current measure instead of just a small vertical bar over approximate notes
-            disableCursor: false,
             drawingParameters: compactMode ? "compact" : "default", // try compact (instead of default)
             drawPartNames: true, // try false
             // drawTitle: false,
@@ -661,46 +647,6 @@ import { TransposeCalculator } from '../src/Plugins/Transpose/TransposeCalculato
         if (versionDiv) {
             versionDiv.innerHTML = "OSMD Version: " + openSheetMusicDisplay.Version.replace("-release", "").replace("-dev", "");
         }
-
-        window.addEventListener("keydown", function (e) {
-            var event = window.event ? window.event : e;
-            // left arrow key
-            if (event.keyCode === 37) {
-                openSheetMusicDisplay.cursor.previous();
-            }
-            // right arrow key
-            if (event.keyCode === 39) {
-                openSheetMusicDisplay.cursor.next();
-            }
-        });
-        previousCursorBtn?.addEventListener("click", function () {
-            openSheetMusicDisplay.cursor.previous();
-        });
-        nextCursorBtn.addEventListener("click", function () {
-            openSheetMusicDisplay.cursor.next();
-        });
-        resetCursorBtn.addEventListener("click", function () {
-            openSheetMusicDisplay.cursor.reset();
-        });
-        if (followCursorCheckbox) {
-            followCursorCheckbox.onclick = function () {
-                openSheetMusicDisplay.FollowCursor = !openSheetMusicDisplay.FollowCursor;
-            }
-        }
-        hideCursorBtn.addEventListener("click", function () {
-            if (openSheetMusicDisplay.cursor) {
-                openSheetMusicDisplay.cursor.hide();
-            } else {
-                console.info("Can't hide cursor, as it was disabled (e.g. by drawingParameters).");
-            }
-        });
-        showCursorBtn.addEventListener("click", function () {
-            if (openSheetMusicDisplay.cursor) {
-                openSheetMusicDisplay.cursor.show();
-            } else {
-                console.info("Can't show cursor, as it was disabled (e.g. by drawingParameters).");
-            }
-        });
 
         if(transposeBtn && transpose){
             transposeBtn.onclick = function(){

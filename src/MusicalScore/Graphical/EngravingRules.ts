@@ -252,8 +252,6 @@ export class EngravingRules {
     public RepetitionEndingLabelYOffset: number;
     public RepetitionEndingLineYLowerOffset: number;
     public RepetitionEndingLineYUpperOffset: number;
-    /** Whether the cursor should ignore / skip repetitions (alternative name: SkipRepetitions). False by default */
-    public CursorIgnoreRepetitions: boolean;
     public VoltaOffset: number;
     /** X offset applied after label was moved to not overflow the staffline to the left.
      * Without this offset, simply removing the overflow is usually too strict, moving it too far unnecessarily.
@@ -485,7 +483,6 @@ export class EngravingRules {
     public DefaultColorLyrics: string;
     public DefaultColorChordSymbol: string;
     public DefaultColorTitle: string;
-    public DefaultColorCursor: string;
     public DefaultFontFamily: string;
     public DefaultFontStyle: FontStyles;
     public DefaultVexFlowNoteFont: string;
@@ -575,7 +572,6 @@ export class EngravingRules {
     public DarkModeEnabled: boolean;
     public UsePageBackgroundColorForTabNotes: boolean;
     public RenderSingleHorizontalStaffline: boolean;
-    public RestoreCursorAfterRerender: boolean;
     public StretchLastSystemLine: boolean;
     /** Ignore brackets - e.g. `( )` - that were supposed to be around a note,
      * but were inserted as a words element in the MusicXML, which can't be matched to the note anymore,
@@ -878,7 +874,6 @@ export class EngravingRules {
         this.RepetitionEndingLabelYOffset = 0.3;
         this.RepetitionEndingLineYLowerOffset = 0.5;
         this.RepetitionEndingLineYUpperOffset = 0.3;
-        this.CursorIgnoreRepetitions = false;
         this.VoltaOffset = 2.5;
 
         // <direction><word> nodes text alignment
@@ -1003,7 +998,6 @@ export class EngravingRules {
         this.ColorBeams = true;
         this.ColorFlags = true;
         this.applyDefaultColorMusic("#000000"); // black. undefined is only black if a note's color hasn't been changed before.
-        this.DefaultColorCursor = "#33e02f"; // green
         this.DefaultFontFamily = "Times New Roman"; // what OSMD was initially optimized for
         this.DefaultFontStyle = FontStyles.Regular;
         this.DefaultVexFlowNoteFont = "gonville"; // was the default vexflow font up to vexflow 1.2.93, now it's Bravura, which is more cursive/bold
@@ -1057,7 +1051,6 @@ export class EngravingRules {
         this.NewPageAtXMLNewPageAttribute = false;
         this.NewSystemAtXMLNewPageAttribute = false;
         this.RenderXMeasuresPerLineAkaSystem = 0;
-        this.RestoreCursorAfterRerender = true;
         this.StretchLastSystemLine = false;
         this.IgnoreBracketsWords = true;
         this.PlaceWordsInsideStafflineFromXml = false;
