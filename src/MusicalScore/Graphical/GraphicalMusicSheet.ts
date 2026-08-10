@@ -4,7 +4,6 @@ import {GraphicalMeasure} from "./GraphicalMeasure";
 import {GraphicalMusicPage} from "./GraphicalMusicPage";
 import {VerticalGraphicalStaffEntryContainer} from "./VerticalGraphicalStaffEntryContainer";
 import {GraphicalLabel} from "./GraphicalLabel";
-import {GraphicalLine} from "./GraphicalLine";
 import {MusicSystem} from "./MusicSystem";
 import {GraphicalStaffEntry} from "./GraphicalStaffEntry";
 import {SourceStaffEntry} from "../VoiceData/SourceStaffEntry";
@@ -22,7 +21,6 @@ import log from "loglevel";
 import {CollectionUtil} from "../../Util/CollectionUtil";
 import {SelectionStartSymbol} from "./SelectionStartSymbol";
 import {SelectionEndSymbol} from "./SelectionEndSymbol";
-import {OutlineAndFillStyleEnum} from "./DrawingEnums";
 import { MusicSheetDrawer } from "./MusicSheetDrawer";
 import { GraphicalVoiceEntry } from "./GraphicalVoiceEntry";
 import { GraphicalObject } from "./GraphicalObject";
@@ -53,7 +51,6 @@ export class GraphicalMusicSheet {
     private composer: GraphicalLabel;
     private lyricist: GraphicalLabel;
     private copyright: GraphicalLabel;
-    private cursors: GraphicalLine[] = [];
     private selectionStartSymbol: SelectionStartSymbol;
     private selectionEndSymbol: SelectionEndSymbol;
     private minAllowedSystemWidth: number;
@@ -137,10 +134,6 @@ export class GraphicalMusicSheet {
         this.copyright = value;
     }
 
-    public get Cursors(): GraphicalLine[] {
-        return this.cursors;
-    }
-
     public get SelectionStartSymbol(): SelectionStartSymbol {
         return this.selectionStartSymbol;
     }
@@ -219,7 +212,6 @@ export class GraphicalMusicSheet {
     }
 
     public findGraphicalMeasure(measureIndex: number, staffIndex: number): GraphicalMeasure {
-        // note the cursor calls this with measureIndex 1 (measure 2) when advancing beyond the end of a 1-measure piece
         for (let i: number = measureIndex; i >= 0; i--) {
             const gMeasure: GraphicalMeasure = this.measureList[i]?.[staffIndex];
             if (gMeasure) {
@@ -948,18 +940,6 @@ export class GraphicalMusicSheet {
             }
         }
         return undefined;
-    }
-
-    public calculateCursorLineAtTimestamp(musicTimestamp: Fraction, styleEnum: OutlineAndFillStyleEnum): GraphicalLine {
-        const result: [number, MusicSystem] = this.calculateXPositionFromTimestamp(musicTimestamp);
-        const xPos: number = result[0];
-        const correspondingMusicSystem: MusicSystem = result[1];
-        if (!correspondingMusicSystem || correspondingMusicSystem.StaffLines.length === 0) {
-            return undefined;
-        }
-        const yCoordinate: number = correspondingMusicSystem.PositionAndShape.AbsolutePosition.y;
-        const height: number = CollectionUtil.last(correspondingMusicSystem.StaffLines).PositionAndShape.RelativePosition.y + 4;
-        return new GraphicalLine(new PointF2D(xPos, yCoordinate), new PointF2D(xPos, yCoordinate + height), 3, styleEnum);
     }
 
     public calculateXPositionFromTimestamp(timeStamp: Fraction): [number, MusicSystem] {

@@ -302,12 +302,6 @@ select {
     left:50%;
     transform: translateX(-50%);
   }
-  #cursorControls{
-    margin-top: 5px;
-    border-top: var(--thick-border-size) solid var(--theme-color-dark);
-    border-radius: 5px 5px 0px 0px;  
-    order:-1;
-  }
   .portraitCollapsible{
     display: inline;
   }

@@ -7,9 +7,6 @@ import { Dictionary } from "typescript-collections";
  */
 export enum OutlineAndFillStyleEnum {
     BaseWritingColor,
-    FollowingCursor,
-    AlternativeFollowingCursor,
-    PlaybackCursor,
     Highlighted,
     ErrorUnderlay,
     Selected,
@@ -44,9 +41,6 @@ export enum OutlineAndFillStyleEnum {
 export const OUTLINE_AND_FILL_STYLE_DICT: Dictionary<OutlineAndFillStyleEnum, string> =
     new Dictionary<OutlineAndFillStyleEnum, string>();
 OUTLINE_AND_FILL_STYLE_DICT.setValue(OutlineAndFillStyleEnum.BaseWritingColor, "Thistle");
-OUTLINE_AND_FILL_STYLE_DICT.setValue(OutlineAndFillStyleEnum.FollowingCursor, "Aqua");
-OUTLINE_AND_FILL_STYLE_DICT.setValue(OutlineAndFillStyleEnum.AlternativeFollowingCursor, "Azure");
-OUTLINE_AND_FILL_STYLE_DICT.setValue(OutlineAndFillStyleEnum.PlaybackCursor, "Bisque");
 OUTLINE_AND_FILL_STYLE_DICT.setValue(OutlineAndFillStyleEnum.Highlighted, "CadetBlue");
 OUTLINE_AND_FILL_STYLE_DICT.setValue(OutlineAndFillStyleEnum.ErrorUnderlay, "DarkBlue");
 OUTLINE_AND_FILL_STYLE_DICT.setValue(OutlineAndFillStyleEnum.Selected, "DarkGoldenRod");
@@ -90,7 +84,6 @@ export enum GraphicalLayers {
     Highlight,
     MeasureError,
     SelectionSymbol,
-    Cursor,
     PSI_Debug,
     Notes,
     Comment,

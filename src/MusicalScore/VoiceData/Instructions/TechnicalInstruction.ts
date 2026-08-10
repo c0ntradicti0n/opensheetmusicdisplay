@@ -13,7 +13,6 @@ export class TechnicalInstruction {
     /** Whether this fingering is a substitution (replaces another fingering). */
     public substitution: boolean = false;
     /** To be able to set fontFamily for fingerings, e.g. (after load, before render):
-     * osmd.cursor.GNotesUnderCursor()[0].parentVoiceEntry.parentVoiceEntry.TechnicalInstructions[0].fontFamily = "Comic Sans MS"
      * Note that staffEntry.FingeringInstructions is only created during render(),
      *   so it's no use setting it there before render.
      */

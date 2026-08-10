@@ -2,14 +2,6 @@ import { ColoringModes } from "../Common/Enums/ColoringModes";
 import { FontStyles } from "../Common/Enums/FontStyles";
 import { DrawingParametersEnum } from "../Common/Enums/DrawingParametersEnum";
 
-export enum CursorType {
-    Standard = 0,
-    ThinLeft = 1,
-    ShortThinTopLeft = 2,
-    CurrentArea = 3,
-    CurrentAreaLeft = 4,
-}
-
 /** Possible options for the OpenSheetMusicDisplay constructor and osmd.setOptions(). None are mandatory.
  *  Note that after using setOptions(), you have to call osmd.render() again to make changes visible.
  *  Example: osmd.setOptions({defaultColorRest: "#AAAAAA", drawSubtitle: false}); osmd.render();
@@ -81,10 +73,6 @@ export interface IOSMDOptions {
     defaultFontFamily?: string;
     /** Default font style, e.g. FontStyles.Bold (1). Default Regular (0). */
     defaultFontStyle?: FontStyles;
-    /** Don't show/load cursor. Will override disableCursor in drawingParameters. */
-    disableCursor?: boolean;
-    /** Follow Cursor: Scroll the page when cursor.next() is called and the cursor moves into a new system outside of the current view frame. */
-    followCursor?: boolean;
     /** Broad Parameters like compact or preview mode.
      * Also try "compacttight", which is like compact but also reduces margins.
      * To see what this mode does and maybe adjust the spacing parameters yourself instead of using the mode,
@@ -269,10 +257,6 @@ export interface IOSMDOptions {
      */
     autoGenerateMultipleRestMeasuresFromRestMeasures?: boolean;
     /**
-     * Defines multiple simultaneous cursors. If left undefined the standard cursor will be used.
-     */
-    cursorsOptions?: CursorOptions[];
-    /**
      * Whether to calculate the skyline and bottom-line geometrically, from the extents of the VexFlow draw calls,
      * instead of drawing each measure on a hidden canvas and reading back its pixels, which is much slower. Default true.
      * If set to false, the previous pixel-based calculation is used, see preferredSkyBottomLineBatchCalculatorBackend.
@@ -344,22 +328,4 @@ export interface AutoBeamOptions {
      * E.g. [[3,4],[1,4]] will beam the first 3 quarters of a measure, then the last quarter.
      */
     groups?: [number[]];
-}
-
-export interface CursorOptions {
-    /**
-     * Type of cursor:
-     * 0: Standard highlighting current notes
-     * 1: Thin line left to the current notes
-     * 2: Short thin line on top of stave and left to the current notes
-     * 3: Current measure
-     * 4: Current measure to left of current notes
-     */
-    type: CursorType;
-    /** Color to draw the cursor */
-    color: string;
-    /** alpha value to be used with color (0.0 transparent, 0.5 medium, 1.0 opaque). */
-    alpha: number;
-    /** If true, this cursor will be followed. */
-    follow: boolean;
 }

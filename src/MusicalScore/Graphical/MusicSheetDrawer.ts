@@ -72,23 +72,6 @@ export abstract class MusicSheetDrawer {
         this.graphicalMusicSheet = graphicalMusicSheet;
         this.rules = graphicalMusicSheet.ParentMusicSheet.Rules;
         this.drawSplitScreenLine();
-        if (this.drawingParameters.drawCursors) {
-            for (const line of graphicalMusicSheet.Cursors) {
-                if (!line) {
-                    // TODO GraphicalMusicSheet.calculateCursorLineAtTimestamp() can return undefined.
-                    // why does this happen in the VexFlowMusicSheetDrawer_Test? (it("draws cursor..."))
-                    continue;
-                }
-                const psi: BoundingBox = new BoundingBox(line);
-                psi.AbsolutePosition = line.Start;
-                psi.BorderBottom = line.End.y - line.Start.y;
-                psi.BorderRight = line.Width / 2.0;
-                psi.BorderLeft = -line.Width / 2.0;
-                if (this.isVisible(psi)) {
-                    this.drawLineAsVerticalRectangle(line, <number>GraphicalLayers.Cursor);
-                }
-            }
-        }
         // Draw the vertical ScrollIndicator
         if (this.drawingParameters.drawScrollIndicator) {
             this.drawScrollIndicator();
