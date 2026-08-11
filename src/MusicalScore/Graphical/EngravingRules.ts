@@ -837,7 +837,7 @@ export class EngravingRules {
         this.TabXNoteheadScale = 0.9;
 
         // Slur and Tie variables
-        this.SlurPlacementFromXML = true;
+        this.SlurPlacementFromXML = true; // respect XML placement; absent placement → auto (prefer above)
         this.SlurPlacementAtStems = false;
         this.SlurPlacementUseSkyBottomLine = false;
         this.BezierCurveStepSize = 1000;
