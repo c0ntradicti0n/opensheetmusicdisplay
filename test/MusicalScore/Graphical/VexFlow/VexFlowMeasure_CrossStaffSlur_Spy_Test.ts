@@ -8,6 +8,7 @@ import { TestUtils } from "../../../Util/TestUtils";
 import { VexFlowMeasure } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowMeasure";
 import { VexFlowStaffLine } from "../../../../src/MusicalScore/Graphical/VexFlow/VexFlowStaffLine";
 import { GraphicalSlur } from "../../../../src/MusicalScore/Graphical/GraphicalSlur";
+import { PlacementEnum } from "../../../../src/MusicalScore/VoiceData/Expressions/AbstractExpression";
 import { renderToSvg } from "../../../Util/SlurQualityReporter";
 
 function loadScore(path: string): { gms: GraphicalMusicSheet, calc: VexFlowMusicSheetCalculator } {
@@ -145,16 +146,23 @@ describe("Cross-Staff Slur Spy Tests", () => {
                 `expected ≥1 cross-staff slur, got ${slurs.length}`);
         });
 
-        it("all cross-staff slurs have positive upward bow (CP above chord)", () => {
+        it("cross-staff slurs bow on their placement side", () => {
+            // Respects the XML placement preset: an Above-placed slur must not
+            // bow downward (bow < -2); a Below-placed slur must not balloon
+            // upward (bow > 2). Issue 87: bottom slurs render below.
             const failures: string[] = [];
             for (const s of slurs) {
-                if (s.bow < -2) {
+                const isAbove: boolean = s.slur.placement === PlacementEnum.Above;
+                if (isAbove && s.bow < -2) {
                     failures.push(
-                        `M${s.measure}.S${s.stave} bow=${s.bow.toFixed(1)}`);
+                        `M${s.measure}.S${s.stave} bow=${s.bow.toFixed(1)} (Above slur bows down)`);
+                } else if (!isAbove && s.bow > 2) {
+                    failures.push(
+                        `M${s.measure}.S${s.stave} bow=${s.bow.toFixed(1)} (Below slur bows up)`);
                 }
             }
             expect(failures).to.deep.equal([],
-                `${failures.length} slurs with negative bow:\n` + failures.join("\n"));
+                `${failures.length} slurs bowing against their placement:\n` + failures.join("\n"));
         });
 
         it("cross-staff slurs collect obstacles", () => {

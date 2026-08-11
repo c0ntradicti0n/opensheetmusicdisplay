@@ -38,9 +38,12 @@ export class GraphicalSlur extends GraphicalCurve {
     /** Minimum cp_y from cross-staff merged-obstacle clearance. */
     private mergedClearanceCpY: number = -Infinity;
 
+    private rules?: EngravingRules;
+
     constructor(slur: Slur, rules?: EngravingRules) {
         super();
         this.slur = slur;
+        this.rules = rules;
     }
 
     public static Compare (x: GraphicalSlur, y: GraphicalSlur ): number {
@@ -753,16 +756,53 @@ export class GraphicalSlur extends GraphicalCurve {
      * @param staffLine
      */
     private calculatePlacement(skyBottomLineCalculator: SkyBottomLineCalculator, staffLine: StaffLine): void {
-        // old version: when lyrics are given place above:
-        // if ( !this.slur.StartNote.ParentVoiceEntry.LyricsEntries.isEmpty || (this.slur.EndNote !== undefined
-        //                                     && !this.slur.EndNote.ParentVoiceEntry.LyricsEntries.isEmpty) ) {
-        //     this.placement = PlacementEnum.Above;
-        //     return;
+        // Respect the XML placement when requested (SlurPlacementFromXML defaults
+        // to true): a slur written "below" stays below, "above" stays above. This
+        // is what makes flips (a rewritten placement attribute) take effect. Only
+        // within-staff slurs: a cross-staff slur's "below" is a MuseScore export
+        // artifact (source slurs span the inter-staff gap regardless), and its
+        // arc-over design is what the solver is tuned for.
+        if (this.rules?.SlurPlacementFromXML && !this.slur.isCrossed()) {
+            if (this.slur.PlacementXml === PlacementEnum.Below) {
+                this.placement = PlacementEnum.Below;
+                return;
+            }
+            if (this.slur.PlacementXml === PlacementEnum.Above) {
+                this.placement = PlacementEnum.Above;
+                return;
+            }
+            // No XML direction: auto-place. Prefer above; flip below when the
+            // notes sit so high that an above arc would not fit within the staff.
+            this.placement = this.calculateAutoPlacement(staffLine);
+            return;
+        }
 
         // The default placement for slurs is above.
         if (this.placement !== PlacementEnum.Below) {
             this.placement = PlacementEnum.Above;
         }
+    }
+
+    /** Minimum room above the slur's chord (staff units, top line = 0) for an
+     *  auto-placed above slur. Below that, auto-placement flips the slur below. */
+    public static autoPlaceMinAboveSpace: number = 2.0;
+
+    /** Auto placement for slurs without an XML direction: prefer above, but flip
+     *  below when the chord sits high enough that an above arc would not fit.
+     *  Uses the VF note's line: a 5-line staff spans vfLine 1 (bottom) to 5 (top),
+     *  so room above the chord = 5 - highest vfLine of the start/end chord. */
+    private calculateAutoPlacement(_staffLine: StaffLine): PlacementEnum {
+        const {start, end} = this.resolveSlurNotes();
+        let highestLine: number = -Infinity;
+        const consider: (note: GraphicalNote | undefined) => void = (note: GraphicalNote | undefined): void => {
+            const vf: VF.StemmableNote | undefined = (note as VexFlowGraphicalNote)?.vfnote?.[0];
+            if (vf) { highestLine = Math.max(highestLine, vf.getLineNumber()); }
+        };
+        consider(start);
+        consider(end);
+        if (!isFinite(highestLine)) { return PlacementEnum.Above; }
+        const roomAbove: number = 5 - highestLine;
+        return roomAbove < GraphicalSlur.autoPlaceMinAboveSpace ? PlacementEnum.Below : PlacementEnum.Above;
     }
 
     /**
