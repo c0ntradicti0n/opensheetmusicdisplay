@@ -42,12 +42,17 @@ export class SlurReader {
                                 slurPlacementXml = PlacementEnum.Below;
                             }
                         }
-                        const orientationAttr: Attr = slurNode.attribute("orientation"); // alternative for placement, used by Sibelius
-                        if (orientationAttr && orientationAttr.value) {
-                            if (orientationAttr.value === "over") {
-                                slurPlacementXml = PlacementEnum.Above;
-                            } else if (orientationAttr.value === "under") {
-                                slurPlacementXml = PlacementEnum.Below;
+                        // orientation is a deprecated alternative to placement (Sibelius):
+                        // honor it only when placement didn't already set a value, so an
+                        // explicit placement (or a flipped one) stays authoritative.
+                        if (slurPlacementXml === PlacementEnum.NotYetDefined) {
+                            const orientationAttr: Attr = slurNode.attribute("orientation");
+                            if (orientationAttr && orientationAttr.value) {
+                                if (orientationAttr.value === "over") {
+                                    slurPlacementXml = PlacementEnum.Above;
+                                } else if (orientationAttr.value === "under") {
+                                    slurPlacementXml = PlacementEnum.Below;
+                                }
                             }
                         }
                         if (type === "start") {
