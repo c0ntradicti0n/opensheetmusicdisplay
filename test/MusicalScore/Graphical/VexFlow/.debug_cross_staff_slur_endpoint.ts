@@ -55,8 +55,8 @@ interface ScoreConfig {
 }
 
 const SCORES: ScoreConfig[] = [
-        { name: "Dichterliebe", path: "Dichterliebe01.xml", maxCpY: 8.0 },
-
+    { name: "issue122", path: "issue122_accents_clearing.musicxml", maxCpY: 8.0 },
+    { name: "Dichterliebe", path: "Dichterliebe01.xml", maxCpY: 8.0 },
     { name: "John Field", path: ".john-field-piano-concerto-7_m318-323.mxl", maxCpY: 6.0 },
     { name: "Beethoven", path: "Beethoven_AnDieFerneGeliebte.xml", maxCpY: 6.0 },
         { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0 },
@@ -927,6 +927,123 @@ describe("Debug slur obstacles", () => {
                 for (const r of reports) {
                     const flag: string = r.collision ? " 💥" : r.balloon ? " 🎈" : "";
                     console.warn(`    ${r.id}${flag} frame=${r.frame} crossed=${r.isCrossed} ${r.placement} clearance=${r.clearancePx.toFixed(1)}px@t=${r.clearanceT.toFixed(2)} bow=${r.bowPx.toFixed(1)}px r=${r.bowRatio.toFixed(3)} obs=${r.obstacleCount} x=${r.crossingCount}↓${r.passBelowCount} leak=${r.leakPx.toFixed(0)}${r.trusted ? "" : ` !${r.reasons.join(",")}`}`);
+                }
+            });
+
+            // ── Articulation + tuplet dump (issue 122) ──────────────────
+
+            it("dumps OSMD tuplet model", () => {
+                if (!gmsRef) { return; }
+                console.warn(`\n  ── OSMD tuplets ──`);
+                for (const page of gmsRef.MusicPages) {
+                    for (const sys of page.MusicSystems) {
+                        for (const col of sys.GraphicalMeasures) {
+                            for (const m of col) {
+                                const gse: GraphicalStaffEntry[] = (m as any).staffEntries ?? [];
+                                const tups: any[] = (m as any).tuplets ?? [];
+                                if (!tups) { continue; }
+                                for (const voiceId in tups) {
+                                    for (const builder of tups[voiceId] ?? []) {
+                                        const t: any = builder[0];
+                                        const ve: any[] = builder[1];
+                                        const bracketed: boolean = t.shouldBeBracketed(
+                                            (rulesRef as any).TupletsBracketedUseXMLValue,
+                                            (rulesRef as any).TupletsBracketed,
+                                            (rulesRef as any).TripletsBracketed,
+                                            false,
+                                            false
+                                        );
+                                        // VF tuplet (post-render): bracketed option + geometry
+                                        const vft: any = (m as any).osmdTupletToVfTuplet?.get?.(t);
+                                        const vfOpts: any = vft?.options;
+                                        const vfX: number = vft?.getX?.() ?? NaN;
+                                        const vfW: number = vft?.getWidth?.() ?? NaN;
+                                        // beam info: does every note share the starting beam?
+                                        const startBeam: any = t.Notes?.[0]?.[0]?.NoteBeam;
+                                        const allSameBeam: boolean = !!startBeam && t.Notes.every((ng: any[]) => ng[0].NoteBeam === startBeam);
+                                        const groupInfo: string[] = t.Notes.map((ng: any[]) => {
+                                            const beamRefs: string = ng.map((n: any) => {
+                                                const b: any = n.NoteBeam;
+                                                return b ? `b:${ng.indexOf(n)}` : `-`;
+                                            }).join(",");
+                                            return `${ng.map((n: any) => n?.id ?? "?").join("+")}[${beamRefs}]`;
+                                        });
+                                        // every group has ≥1 beamed note AND all those beams are one object
+                                        const beamObjs: any[] = t.Notes.map((ng: any[]) => ng.find((n: any) => n.NoteBeam)?.NoteBeam);
+                                        const singleBeam: boolean = beamObjs.every((b: any) => !!b && b === beamObjs[0]);
+                                        // VF-side: do the tuplet's VF stavenotes share one VF beam?
+                                        const vfNotes: any[] = vft?.notes ?? [];
+                                        const firstVfBeam: any = vfNotes[0]?.beam;
+                                        const vfSingleBeam: boolean = !!firstVfBeam && vfNotes.every((n: any) => n.beam === firstVfBeam);
+                                        console.warn(`    tuplet m=${m.MeasureNumber} voice=${voiceId} osmdSingleBeam=${singleBeam} vfSingleBeam=${vfSingleBeam} vfBracketed=${vfOpts?.bracketed} groups=[${groupInfo.join(" | ")}]`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            it("dumps VF articulation modifier internals", () => {
+                if (!gmsRef) { return; }
+                console.warn(`\n  ── VF articulation modifiers ──`);
+                for (const page of gmsRef.MusicPages) {
+                    for (const sys of page.MusicSystems) {
+                        for (const col of sys.GraphicalMeasures) {
+                            for (const m of col) {
+                                const gse: GraphicalStaffEntry[] = (m as any).staffEntries ?? [];
+                                for (const se of gse) {
+                                    for (const gve of (se as any).graphicalVoiceEntries ?? []) {
+                                        const vfnote: VF.StemmableNote = (gve as any).vfStaveNote;
+                                        if (!vfnote?.getModifiers) { continue; }
+                                        const arts: VF.Modifier[] = vfnote.getModifiers().filter(
+                                            (mod: VF.Modifier) => mod.getCategory?.() === "Articulation");
+                                        if (!arts.length) { continue; }
+                                        const props: any[] = (vfnote as any).getKeyProps?.() ?? [];
+                                        const ys: number[] = (vfnote as any).getYs?.() ?? [];
+                                        const ext: any = (vfnote as any).getStemExtents?.() ?? {};
+                                        const stemDir: number = vfnote.getStemDirection?.() ?? "?";
+                                        console.warn(`    stavenote id=${(vfnote as any).getAttribute?.("id")} keys=${props.map((p: any) => `line=${p.line}`).join(",")} ys=[${ys.map((y: number) => y.toFixed(1)).join(",")}] stemDir=${stemDir} stemBase=${ext.baseY} stemTop=${ext.topY}`);
+                                        for (const art of arts) {
+                                            console.warn(`      art type=${(art as any).type} pos=${art.getPosition?.()} textLine=${(art as any).textLine} x=${(art as any).x?.toFixed(1)} y=${(art as any).y?.toFixed(1)} yShift=${(art as any)._userYShift} betweenLines=${(art as any).articulation?.betweenLines}`);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            it("dumps articulations and tuplet brackets", () => {
+                if (!svg) { return; }
+                // Articulation glyphs: Bravura/Gonville articulation region U+E4A0..E4B0
+                const artEls: Element[] = Array.from(svg.querySelectorAll("text")).filter((t: Element) => {
+                    const cp: number = t.textContent?.codePointAt(0) ?? 0;
+                    return cp >= 0xE4A0 && cp <= 0xE4B0;
+                });
+                console.warn(`\n  ── Articulations (${artEls.length}) ──`);
+                for (const t of artEls) {
+                    const cp: number = t.textContent?.codePointAt(0) ?? 0;
+                    const x: number = parseFloat(t.getAttribute("x") ?? "NaN");
+                    const y: number = parseFloat(t.getAttribute("y") ?? "NaN");
+                    // nearest notehead bbox from queryNoteheadBBoxes map
+                    let near: string = "?";
+                    let nearD: number = Infinity;
+                    for (const [id, r] of noteheadBBoxes) {
+                        const cx: number = r.x + r.width / 2;
+                        const cy: number = r.y + r.height / 2;
+                        const d: number = Math.abs(x - cx) + Math.abs(y - cy);
+                        if (d < nearD) { nearD = d; near = id; }
+                    }
+                    console.warn(`    cp=${cp.toString(16)} x=${x.toFixed(1)} y=${y.toFixed(1)} nearNote=${near} dist=${nearD.toFixed(1)}px`);
+                }
+                // Tuplet brackets: VF5 draws them as g.vf-tuplet with child path/line
+                const tupletEls: Element[] = Array.from(svg.querySelectorAll("g.vf-tuplet, .vf-tuplet"));
+                console.warn(`\n  ── Tuplet brackets (${tupletEls.length}) ──`);
+                for (const g of tupletEls) {
+                    const d: string = g.querySelector("path")?.getAttribute("d") ?? "";
+                    console.warn(`    class=${g.getAttribute("class")} ${d.slice(0, 120)}`);
                 }
             });
 

@@ -712,11 +712,14 @@ export class VexFlowConverter {
                     vfArt = new VF.Articulation("a>");
                     const slurs: Slur[] = gNote.sourceNote.NoteSlurs;
                     for (const slur of slurs) {
-                        if (slur.StartNote === gNote.sourceNote) { // && slur.PlacementXml === articulation.placement
-                            if (slur.PlacementXml === PlacementEnum.Above) {
-                                vfArt.setYShift(-rules.SlurStartArticulationYOffsetOfArticulation * 10);
-                            } else if (slur.PlacementXml === PlacementEnum.Below) {
-                                vfArt.setYShift(rules.SlurStartArticulationYOffsetOfArticulation * 10);
+                        if (slur.StartNote === gNote.sourceNote) {
+                            // Only shift the accent when it sits on the same side as the slur.
+                            // Otherwise (e.g. up-stem accent below + slur above) the shift
+                            // pushes the accent into the notehead. (issue 122)
+                            const slurAbove: boolean = slur.PlacementXml === PlacementEnum.Above;
+                            const artAbove: boolean = vfArtPosition === VF.Modifier.Position.ABOVE;
+                            if (slurAbove === artAbove) {
+                                vfArt.setYShift((slurAbove ? -1 : 1) * rules.SlurStartArticulationYOffsetOfArticulation * 10);
                             }
                         }
                     }
