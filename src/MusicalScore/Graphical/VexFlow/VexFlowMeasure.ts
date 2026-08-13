@@ -1549,6 +1549,21 @@ export class VexFlowMeasure extends GraphicalMeasure {
                         this.rules.TabTupletsBracketed
                       );
                       let effectiveBracketed: boolean = bracketed;
+                      // Gould (#1400): a tuplet fully covered by one beam carries no
+                      // bracket, regardless of the XML value. Detected on the VF beam
+                      // (set by finalizeBeams before this) because a chord's beam can
+                      // sit on a non-first chord note, making the OSMD NoteBeam check
+                      // in shouldBeBracketed unreliable. An explicit bracket rule
+                      // (TripletsBracketed/TupletsBracketed) still forces one. (issue 122)
+                      const firstVfBeam: VF.Beam = tupletStaveNotes[0]?.beam;
+                      const allOnOneVfBeam: boolean = !!firstVfBeam &&
+                          tupletStaveNotes.every(n => n.beam === firstVfBeam);
+                      const explicitBracketRule: boolean = tuplet.TupletLabelNumber === 3
+                          ? this.rules.TripletsBracketed
+                          : this.rules.TupletsBracketed;
+                      if (bracketed && allOnOneVfBeam && !explicitBracketRule) {
+                          effectiveBracketed = false;
+                      }
                       if (bracketed && this.rules.TupletBracketsIfRepeatedOnlyFirst &&
                           previousTupletBracketed && this.isTupletRepeatOfPrevious(previousTuplet, tuplet)) {
                           // Gould: in a run of consecutive identical tuplets only the first

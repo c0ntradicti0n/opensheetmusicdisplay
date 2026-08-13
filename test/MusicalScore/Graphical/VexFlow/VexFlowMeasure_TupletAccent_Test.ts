@@ -4,23 +4,26 @@ import { OpenSheetMusicDisplay } from "../../../../src/OpenSheetMusicDisplay/Ope
 import { TestUtils } from "../../../Util/TestUtils";
 
 /**
- * Issue 90 — accent vs tuplet bracket.
+ * Issue 90 — accent vs tuplet bracket, and Gould beamed-tuplet rule (issue 122).
  *
  * A foreign-voice note at the same tick shares its ModifierContext with the
  * tuplet's first note. VexFlow's Tuplet.getYPosition() used the shared
  * context's cumulative topTextLine, so a foreign accent (e.g. the strong
- * accent on the second treble voice) inflated the bracket's clearance and
- * pushed the bracket far above the beam (y=-36 instead of y=1.5).
+ * accent on the second treble voice) inflated the tuplet's clearance and
+ * pushed its number/bracket far above the beam (y=-36 instead of y=1.5).
  *
- * Regression: each tuplet bracket must sit close above its own beam, never
- * detaching by more than 25px from the beam's highest point.
+ * Gould (#1400): a tuplet fully covered by one beam carries no bracket —
+ * only its number. The number shares getYPosition with the bracket, so it
+ * must still sit close above the beam, never detached by more than 25px
+ * from the beam's highest point.
  */
 
 interface TupletInfo {
     id: string;
-    bracketY: number;
+    numberY: number;
     xLeft: number;
     xRight: number;
+    hasBracket: boolean;
 }
 
 function renderToSVG(scorePath: string): Promise<SVGElement> {
@@ -45,26 +48,17 @@ function parseTuplets(svg: SVGElement): TupletInfo[] {
     for (let i: number = 0; i < tuplets.length; i++) {
         const t: Element = tuplets[i];
         const id: string = t.getAttribute("data-tuplet-id") || t.getAttribute("id") || `tuplet_${i}`;
-        const rects: NodeListOf<Element> = t.querySelectorAll("rect");
-        let bracketY: number = Infinity;
-        let xLeft: number = Infinity;
-        let xRight: number = -Infinity;
-        for (let r: number = 0; r < rects.length; r++) {
-            const rect: Element = rects[r];
-            // Skip the transparent click-target rect (opacity="0").
-            if (rect.getAttribute("opacity") === "0") { continue; }
-            const y: string | null = rect.getAttribute("y");
-            const x: string | null = rect.getAttribute("x");
-            const w: string | null = rect.getAttribute("width");
-            if (y && parseFloat(y) < bracketY) { bracketY = parseFloat(y); }
-            if (x && parseFloat(x) < xLeft) { xLeft = parseFloat(x); }
-            if (x && w && parseFloat(x) + parseFloat(w) > xRight) {
-                xRight = parseFloat(x) + parseFloat(w);
-            }
-        }
-        if (isFinite(bracketY)) {
-            result.push({ id, bracketY, xLeft, xRight });
-        }
+        // The tuplet number is a <text> glyph (e.g. U+E883 "3"); the bracket,
+        // if present, would be opaque rects with height 1 (the number shares
+        // the tuplet's Y position either way).
+        const textEl: Element | null = t.querySelector("text");
+        if (!textEl) { continue; }
+        const y: number = parseFloat(textEl.getAttribute("y") ?? "NaN");
+        const x: number = parseFloat(textEl.getAttribute("x") ?? "NaN");
+        if (Number.isNaN(y) || Number.isNaN(x)) { continue; }
+        const bracketRects: Element[] = Array.from(t.querySelectorAll("rect"))
+            .filter(r => r.getAttribute("opacity") !== "0" && parseFloat(r.getAttribute("height") ?? "0") < 2);
+        result.push({ id, numberY: y, xLeft: x, xRight: x, hasBracket: bracketRects.length >= 2 });
     }
     return result;
 }
@@ -89,7 +83,7 @@ function getBeamTopY(svg: SVGElement): number | undefined {
     return isFinite(beamTop) ? beamTop : undefined;
 }
 
-describe("Issue 90 — accent must not push the tuplet bracket", () => {
+describe("Issue 90 — accent must not push the tuplet number", () => {
     let tuplets: TupletInfo[];
     let beamTop: number | undefined;
 
@@ -110,23 +104,30 @@ describe("Issue 90 — accent must not push the tuplet bracket", () => {
         expect(beamTop).to.not.be.undefined;
     });
 
-    it("every tuplet bracket sits close above its beam", () => {
+    it("beamed tuplets are number-only (Gould: no bracket)", () => {
+        for (const t of tuplets) {
+            expect(t.hasBracket, `tuplet ${t.id} should have no bracket when beamed`)
+                .to.be.false;
+        }
+    });
+
+    it("every tuplet number sits close above its beam", () => {
         expect(beamTop, "beam top Y required").to.not.be.undefined;
         const maxGap: number = 25;
         for (const t of tuplets) {
-            const gap: number = beamTop! - t.bracketY;
+            const gap: number = beamTop! - t.numberY;
             expect(
                 gap,
-                `tuplet ${t.id} bracket at y=${t.bracketY.toFixed(1)} is ` +
+                `tuplet ${t.id} number at y=${t.numberY.toFixed(1)} is ` +
                 `${gap.toFixed(1)}px above beam top y=${beamTop!.toFixed(1)} ` +
                 "(max " + maxGap + "px; a foreign-voice accent used to inflate this)",
             ).to.be.at.most(maxGap);
         }
     });
 
-    it("every tuplet bracket sits above the beam (not below it)", () => {
+    it("every tuplet number sits above the beam (not below it)", () => {
         for (const t of tuplets) {
-            expect(t.bracketY, `tuplet ${t.id} bracket y`).to.be.lessThan(beamTop! + 5);
+            expect(t.numberY, `tuplet ${t.id} number y`).to.be.lessThan(beamTop! + 5);
         }
     });
 });
