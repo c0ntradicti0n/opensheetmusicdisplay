@@ -31,6 +31,10 @@ interface SlurInfo {
     endPt: { x: number; y: number };
     startCp: { x: number; y: number } | null;
     endCp: { x: number; y: number } | null;
+    startPitch: string;
+    endPitch: string;
+    startMeasure: number;
+    endMeasure: number;
     cpY_osmd: number;
     mergedClearance: number;
     rightClearance: number;
@@ -55,6 +59,8 @@ interface ScoreConfig {
 }
 
 const SCORES: ScoreConfig[] = [
+    { name: "Land der Berge", path: "Land_der_Berge.musicxml", maxCpY: 8.0 },
+    { name: "issue123", path: "issue123_strange_slur_beam_collisions.musicxml", maxCpY: 8.0 },
     { name: "issue122", path: "issue122_accents_clearing.musicxml", maxCpY: 8.0 },
     { name: "Dichterliebe", path: "Dichterliebe01.xml", maxCpY: 8.0 },
     { name: "John Field", path: ".john-field-piano-concerto-7_m318-323.mxl", maxCpY: 6.0 },
@@ -120,6 +126,20 @@ function toSvgCoords(osmdX: number, osmdY: number, sl: any): { x: number, y: num
     };
 }
 
+const NOTE_LETTERS: string[] = ["C", "", "D", "", "E", "F", "", "G", "", "A", "", "B"];
+
+function pitchOf(note: any): string {
+    const p: any = note?.Pitch;
+    if (!p) { return "?"; }
+    const letter: string = NOTE_LETTERS[p.FundamentalNote] ?? "?";
+    const acc: string = p.AccidentalHalfTones > 0 ? "#" : p.AccidentalHalfTones < 0 ? "b" : "";
+    return `${letter}${acc}${p.Octave}`;
+}
+
+function measureOf(note: any): number {
+    return note?.SourceMeasure?.MeasureNumber ?? note?.ParentStaffEntry?.VerticalContainerParent?.ParentMeasure?.MeasureNumber ?? -1;
+}
+
 function dumpSkylineForSlur(sl: any, startX: number, endX: number): string {
     const sky: number[] = sl.SkyLine ?? [];
     if (!sky.length) { return "  (no skyline data)"; }
@@ -179,6 +199,63 @@ function collectCrossStaffSlurs(gms: GraphicalMusicSheet, rules: EngravingRules)
                     const vfId: string = vfStart?.getAttribute?.("id") ?? "?";
                     // VF5 note id = xmlId (if set) ?? computedSvgId() (note-{m}-{s}-{v}-{i})
                     const noteId: string = startNote?.xmlId ?? endNote?.xmlId ?? vfId ?? "?";
+                    if (noteId === "note-3-1-2-0") {
+                        const resStart: GraphicalNote | undefined = slur.staffEntries[0]?.findGraphicalNoteFromNote(slur.slur.StartNote);
+                        const resEnd: GraphicalNote | undefined = slur.staffEntries[slur.staffEntries.length - 1]?.findGraphicalNoteFromNote(slur.slur.EndNote);
+                        const dumpGN = (tag: string, gn: GraphicalNote | undefined): string => {
+                            if (!gn) { return `${tag}: undefined`; }
+                            const ve: any = gn.parentVoiceEntry;
+                            return `${tag}: veRel=(${ve?.PositionAndShape?.RelativePosition?.x?.toFixed(2) ?? "?"},${ve?.PositionAndShape?.RelativePosition?.y?.toFixed(2) ?? "?"}) borderTop=${(ve?.PositionAndShape?.BorderTop ?? "?").toFixed(2)} borderBottom=${(ve?.PositionAndShape?.BorderBottom ?? "?").toFixed(2)} staveRel=(${gn.PositionAndShape?.RelativePosition?.x?.toFixed(2) ?? "?"},${gn.PositionAndShape?.RelativePosition?.y?.toFixed(2) ?? "?"}) vfYs=[${(gn as VexFlowGraphicalNote).vfnote?.[0]?.getYs?.()?.map((y: number) => y.toFixed(1)).join(",") ?? "?"}] placement=${slur.placement}`;
+                        };
+                        console.warn(`    [resolved] startGN: ${dumpGN("s", resStart)}`);
+                        console.warn(`    [resolved] endGN:   ${dumpGN("e", resEnd)}`);
+                        const sse0: any = slur.staffEntries[0];
+                        const sseL: any = slur.staffEntries[slur.staffEntries.length - 1];
+                        console.warn(`    [resolved] staffEntries len=${slur.staffEntries.length} first=(${sse0?.PositionAndShape?.RelativePosition?.x?.toFixed(2) ?? "?"},${sse0?.PositionAndShape?.RelativePosition?.y?.toFixed(2) ?? "?"}) last=(${sseL?.PositionAndShape?.RelativePosition?.x?.toFixed(2) ?? "?"},${sseL?.PositionAndShape?.RelativePosition?.y?.toFixed(2) ?? "?"})`);
+                        const slAbsY: number = sl.PositionAndShape?.AbsolutePosition?.y ?? NaN;
+                        const absOf = (gn: GraphicalNote | undefined): string => {
+                            if (!gn) { return "?"; }
+                            const a: any = gn.PositionAndShape?.AbsolutePosition;
+                            return `abs=(${a?.x?.toFixed(2) ?? "?"},${a?.y?.toFixed(2) ?? "?"})`;
+                        };
+                        const vfAbsOf = (gn: GraphicalNote | undefined): string => {
+                            const v: any = (gn as VexFlowGraphicalNote)?.vfnote?.[0];
+                            if (!v) { return "?"; }
+                            return `vfAbsX=${(v.getAbsoluteX?.() ?? NaN).toFixed(1)} vfYs=[${(v.getYs?.() ?? []).map((y: number) => y.toFixed(1)).join(",")}] keyLines=[${(v.getKeyProps?.() ?? []).map((kp: any) => kp.line).join(",")}]`;
+                        };
+                        console.warn(`    [resolved] staffLineAbsY=${slAbsY.toFixed(2)} unitPx=${unitInPixels}`);
+                        console.warn(`    [resolved] start abs: ${absOf(resStart)} ${vfAbsOf(resStart)}`);
+                        console.warn(`    [resolved] end   abs: ${absOf(resEnd)} ${vfAbsOf(resEnd)}`);
+                        console.warn(`    [resolved] slur bezierStartPt=(${slur.bezierStartPt.x.toFixed(2)},${slur.bezierStartPt.y.toFixed(2)}) bezierEndPt=(${slur.bezierEndPt.x.toFixed(2)},${slur.bezierEndPt.y.toFixed(2)}) placement=${slur.placement}`);
+                        // dump all stavenotes of the m3 piano treble measure (staff idx 1)
+                        const m3meas: any = (resStart as any)?.parentVoiceEntry?.parentStaffEntry?.parentMeasure;
+                        if (m3meas) {
+                            for (const gse of (m3meas as any).staffEntries ?? []) {
+                                for (const gve of (gse as any).graphicalVoiceEntries ?? []) {
+                                    const v: any = (gve as any).vfStaveNote;
+                                    if (!v) { continue; }
+                                    const kps: any[] = v.getKeyProps?.() ?? [];
+                                    const keys: string = kps.map((kp: any) => `${kp.key}/${kp.line}`).join(",");
+                                    const veRelY: number = gve?.PositionAndShape?.RelativePosition?.y ?? NaN;
+                                    let bboxStr: string = "?";
+                                    try {
+                                        const bb: any = v.getBoundingBox?.();
+                                        if (bb) { bboxStr = `bbox(x=${bb.x?.toFixed(1)},y=${bb.y?.toFixed(1)},w=${bb.w?.toFixed(1)},h=${bb.h?.toFixed(1)})`; }
+                                    } catch (_e) { bboxStr = "bboxError"; }
+                                    const staveTop: number = v.getStave?.()?.getYForLine?.(0) ?? NaN;
+                                    const mods: string = (v.getModifiers?.() ?? []).map((m: any) => {
+                                        let mb: string = "?";
+                                        try {
+                                            const bb: any = m.getBoundingBox?.();
+                                            if (bb) { mb = `(y=${bb.y?.toFixed(1)},h=${bb.h?.toFixed(1)})`; }
+                                        } catch (_e) { mb = "err"; }
+                                        return `${m.getCategory?.() ?? "?"}${mb}`;
+                                    }).join(" ");
+                                    console.warn(`      stavenote id=${v.getAttribute?.("id")} keys=[${keys}] veRelY=${veRelY.toFixed(2)} vfYs=[${(v.getYs?.() ?? []).map((y: number) => y.toFixed(1)).join(",")}] stemDir=${v.getStemDirection?.()} ${bboxStr} mods=${mods}`);
+                                }
+                            }
+                        }
+                    }
                     const cpY_osmd: number = slur.bezierStartControlPt
                         ? Math.abs(slur.bezierStartControlPt.y - slur.bezierStartPt.y) : 0;
                     const mergedClear: number = getMergedClearance(slur);
@@ -256,6 +333,10 @@ function collectCrossStaffSlurs(gms: GraphicalMusicSheet, rules: EngravingRules)
                         endPt: { x: slur.bezierEndPt.x, y: slur.bezierEndPt.y },
                         startCp: slur.bezierStartControlPt ? { x: slur.bezierStartControlPt.x, y: slur.bezierStartControlPt.y } : null,
                         endCp: slur.bezierEndControlPt ? { x: slur.bezierEndControlPt.x, y: slur.bezierEndControlPt.y } : null,
+                        startPitch: pitchOf(startNote),
+                        endPitch: pitchOf(endNote),
+                        startMeasure: measureOf(startNote),
+                        endMeasure: measureOf(endNote),
                         cpY_osmd,
                         mergedClearance: mergedClear,
                         rightClearance: rightClear,
@@ -890,6 +971,7 @@ describe("Debug slur obstacles", () => {
                     const flag: string = s.cpY_osmd > cfg.maxCpY ? " ⚠️BALLOONED" : "";
                     console.warn(`\n  Slur ${s.id}${flag}:`);
                     console.warn(`    vfId=${s.vfId} isCrossed=${s.isCrossed}`);
+                    console.warn(`    notes: ${s.startPitch} (m${s.startMeasure}) → ${s.endPitch} (m${s.endMeasure})  staff ${s.startNoteStaff}→${s.endNoteStaff}`);
                     console.warn(`    OSMD:  start=(${s.startPt.x.toFixed(2)}, ${s.startPt.y.toFixed(2)})  end=(${s.endPt.x.toFixed(2)}, ${s.endPt.y.toFixed(2)}) spanX=${s.spanX.toFixed(2)}`);
                     if (s.startCp) {
                         console.warn(`    CPs:  cp1=(${s.startCp.x.toFixed(2)}, ${s.startCp.y.toFixed(2)}) cp2=(${s.endCp.x.toFixed(2)}, ${s.endCp.y.toFixed(2)}) cpY=${s.cpY_osmd.toFixed(2)} mL=${s.mergedClearance.toFixed(2)} rC=${s.rightClearance.toFixed(2)} obs=${s.obstacleCount} leak=${s.leakPx.toFixed(1)}px`);
@@ -931,6 +1013,112 @@ describe("Debug slur obstacles", () => {
             });
 
             // ── Articulation + tuplet dump (issue 122) ──────────────────
+
+            it("dumps VF beams with noteheads (issue 123)", () => {
+                if (!gmsRef || !svg) { return; }
+                console.warn(`\n  ── VF beams + noteheads ──`);
+                // notehead text positions from the rendered SVG, keyed by xmlId
+                const nhMap: Map<string, { x: number, y: number }[]> = new Map();
+                for (const nh of svg.querySelectorAll("g.vf-notehead")) {
+                    const noteEl: Element | null = nh.closest("[data-note-id]");
+                    const xmlId: string = noteEl?.getAttribute("data-note-id") ?? "";
+                    if (!xmlId) { continue; }
+                    const t: Element | null = nh.querySelector("text");
+                    if (!t) { continue; }
+                    const x: number = parseFloat(t.getAttribute("x") ?? "NaN");
+                    const y: number = parseFloat(t.getAttribute("y") ?? "NaN");
+                    if (!Number.isNaN(x)) {
+                        const arr = nhMap.get(xmlId) || [];
+                        arr.push({ x, y });
+                        nhMap.set(xmlId, arr);
+                    }
+                }
+                // all beams with their notes + beamline y (from fill path rects)
+                let bi: number = 0;
+                for (const page of gmsRef.MusicPages) {
+                    for (const sys of page.MusicSystems) {
+                        for (const col of sys.GraphicalMeasures) {
+                            for (const m of col) {
+                                const vfbeams: any[] = (m as any).vfbeams ?? {};
+                                const staveNotes: any[] = (m as any).staveNotes ?? [];
+                                for (const voiceId in vfbeams) {
+                                    for (const b of vfbeams[voiceId] ?? []) {
+                                        const notes: any[] = b?.notes ?? [];
+                                        const ids: string[] = notes.map((n: any) => n.getAttribute?.("id") ?? "?");
+                                        const yVals: string[] = notes.map((n: any) => n.getYs?.()?.map((y: number) => y.toFixed(1)).join(",") ?? "?");
+                                        // beamline y from SVG fill path
+                                        let beamY: string = "?";
+                                        const dAttr: string = b?.svgGroup?.querySelector?.("path[stroke='none']")?.getAttribute?.("d") ?? "";
+                                        if (dAttr) {
+                                            const nums: number[] = dAttr.match(/[\d.]+/g)?.map(Number) ?? [];
+                                            if (nums.length >= 4) { beamY = `y ${Math.min(...nums.filter((_v: number, i: number) => i % 2 === 1)).toFixed(1)}..${Math.max(...nums.filter((_v: number, i: number) => i % 2 === 1)).toFixed(1)}`; }
+                                        }
+                                        console.warn(`    beam#${bi} voice=${voiceId} m=${m.MeasureNumber} notes=[${ids.join(", ")}] noteYs=[${yVals.join(" | ")}] beamline=${beamY} stemDir=${(notes[0] as any)?.getStemDirection?.()}`);
+                                        // nearest noteheads in beam x-range
+                                        bi++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // beam#9 (voice-2 E4→F4 up-stem) collision gap vs foreign noteheads
+                const b9 = ((): Element | null => {
+                    for (const b of svg.querySelectorAll("[class*='vf-beam']")) {
+                        const stems: { x: number, y: number }[] = Array.from(b.querySelectorAll("[class*='vf-stem']")).map(
+                            s => { const m: RegExpMatchArray | null = s.querySelector("path")?.getAttribute("d")?.match(/M([\d.-]+) ([\d.-]+)/);
+                                return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: NaN, y: NaN }; })
+                            .filter(s => Number.isFinite(s.x) && Number.isFinite(s.y));
+                        // beam#9 (voice-2 E4→F4) stems sit in x 340..490, y 580..680 (system-2 top staff)
+                        if (stems.some(s => s.x > 330 && s.x < 500 && s.y > 580 && s.y < 680)) { return b; }
+                    }
+                    return null;
+                })();
+                if (b9) {
+                    const rects: { x1: number, x2: number, y2: number }[] = [];
+                    for (const p of b9.querySelectorAll(":scope > path[stroke='none']")) {
+                        const d: string = p.getAttribute("d") ?? "";
+                        const nums: number[] = d.match(/[\d.]+/g)?.map(Number) ?? [];
+                        let mnX = Infinity, mxX = -Infinity, mxY = -Infinity;
+                        for (let i: number = 0; i + 1 < nums.length; i += 2) {
+                            if (nums[i] < mnX) mnX = nums[i];
+                            if (nums[i] > mxX) mxX = nums[i];
+                            if (nums[i + 1] > mxY) mxY = nums[i + 1];
+                        }
+                        if (mxX > mnX) { rects.push({ x1: mnX, x2: mxX, y2: mxY }); }
+                    }
+                    const beamBot: number = Math.max(...rects.map(r => r.y2));
+                    const foreign: number[] = ["p0n19_10", "p0n19_11"].map(
+                        id => { const t: Element | null = svg.querySelector(`[data-note-id="${id}"] text`);
+                            return t ? parseFloat(t.getAttribute("y") ?? "NaN") : NaN; }).filter(Number.isFinite);
+                    const highest: number = Math.min(...foreign);
+                    console.warn(`  beam#9 collision: beamBottom=${beamBot.toFixed(1)} highestForeign=${highest.toFixed(1)} gap=${(highest - beamBot).toFixed(1)}px`);
+                }
+                // all noteheads dump for m19/m20 top staff
+                console.warn(`  ── all noteheads (m19/m20) ──`);
+                for (const [id, poss] of nhMap) {
+                    if (!/p0n(19|20)_/.test(id)) { continue; }
+                    console.warn(`    ${id} ${poss.map((p: { x: number, y: number }) => `(${p.x.toFixed(1)},${p.y.toFixed(1)})`).join(" ")}`);
+                }
+            });
+
+            it("dumps music systems + void geometry", () => {
+                if (!gmsRef) { return; }
+                console.warn(`\n  ── music systems ──`);
+                for (const page of gmsRef.MusicPages) {
+                    for (const sys of page.MusicSystems) {
+                        const ps: any = (sys as any).PositionAndShape;
+                        const abs: any = ps?.AbsolutePosition;
+                        const sz: any = ps?.Size;
+                        console.warn(`  sys top=${(abs?.y ?? NaN).toFixed(1)} h=${(sz?.height ?? NaN).toFixed(1)} bottom=${((abs?.y ?? 0) + (sz?.height ?? 0)).toFixed(1)} staffLines=${(sys as any).StaffLines?.length ?? "?"}`);
+                        for (const sl of (sys as any).StaffLines ?? []) {
+                            const slAbs: any = sl.PositionAndShape?.AbsolutePosition;
+                            const slSz: any = sl.PositionAndShape?.Size;
+                            console.warn(`    staffLine absY=${(slAbs?.y ?? NaN).toFixed(1)} h=${(slSz?.height ?? NaN).toFixed(1)} bottom=${((slAbs?.y ?? 0) + (slSz?.height ?? 0)).toFixed(1)}`);
+                        }
+                    }
+                }
+            });
 
             it("dumps OSMD tuplet model", () => {
                 if (!gmsRef) { return; }

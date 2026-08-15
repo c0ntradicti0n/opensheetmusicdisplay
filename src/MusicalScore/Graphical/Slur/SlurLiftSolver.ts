@@ -134,6 +134,7 @@ export function solveSlurLift(
     //    means any `B < h` grazes the point and forces a lift. ──────────────────
     const bandScale: number = Math.abs(ux);
     const foreignRounds: number = foreign.length + 2;
+    let foreignClearNeed: number = 0;
     for (let round: number = 0; round < foreignRounds; round++) {
         let changed: boolean = false;
         for (const o of foreign) {
@@ -145,6 +146,7 @@ export function solveSlurLift(
             const band: number = (o.bandPx ?? 0) * bandScale;
             if (b < h - band) { continue; } // passes below the notehead body — fine
             const needed: number = (h + opts.marginPx) / (3 * t * (1 - t)); // crossing/grazing → lift over
+            if (needed > foreignClearNeed) { foreignClearNeed = needed; }
             if (needed > hCp) { hCp = needed; changed = true; }
         }
         if (!changed) { break; }
@@ -152,20 +154,22 @@ export function solveSlurLift(
 
     // ── Anti-balloon caps. A cap may only trim EXCESS above the OWN-voice
     //    clearance requirement — never below it, or the curve grazes an own note.
-    //    Foreign-driven lifts are NOT protected by the floor, so a cap can trim
-    //    them; if that lands the curve inside a foreign band it crosses that
-    //    foreign note rather than ballooning (documented trade-off). ───────────
+    //    Foreign-driven lifts are protected only up to foreignClearNeed — the
+    //    height needed to clear a foreign notehead the curve is actually
+    //    crossing/grazing (in the arc's path, already filtered by the reach
+    //    gate). Beyond that a cap trims the lift, and the curve passes the note
+    //    rather than ballooning toward a distant one. ─────────────────────────
     const clearFloor: number = clearHCpOwn;
     // Cap 1: CP no higher than the tallest own obstacle plus a fixed band. Stops
     // the natural bow (which grows with chord length) from ballooning over a low
     // own obstacle set, but yields to clearFloor when a near-edge obstacle needs
     // more.
     if (maxObstacleHOwn > 0) {
-        const cpCap: number = Math.max(clearFloor, maxObstacleHOwn + opts.marginPx + opts.slackPx);
+        const cpCap: number = Math.max(clearFloor, maxObstacleHOwn + opts.marginPx + opts.slackPx, foreignClearNeed);
         if (hCp > cpCap) { hCp = cpCap; }
     }
     // Cap 2: absolute ceiling relative to chord length; also yields to clearFloor.
-    const ratioCeiling: number = Math.max(clearFloor, opts.maxBowRatio * chordLenSafe);
+    const ratioCeiling: number = Math.max(clearFloor, opts.maxBowRatio * chordLenSafe, foreignClearNeed);
     if (hCp > ratioCeiling) { hCp = ratioCeiling; }
 
     // ── Symmetric control points in the chord frame, then rotate back. ─────────

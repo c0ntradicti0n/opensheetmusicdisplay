@@ -3,6 +3,8 @@ import { PointF2D } from "../../Common/DataObjects/PointF2D";
 import { GraphicalNote } from "./GraphicalNote";
 import { GraphicalCurve } from "./GraphicalCurve";
 import { Slur } from "../VoiceData/Expressions/ContinuousExpressions/Slur";
+import { LinkedVoice } from "../VoiceData/LinkedVoice";
+import { Note } from "../VoiceData/Note";
 import { PlacementEnum } from "../VoiceData/Expressions/AbstractExpression";
 import { EngravingRules } from "./EngravingRules";
 import { StaffLine } from "./StaffLine";
@@ -114,7 +116,7 @@ export class GraphicalSlur extends GraphicalCurve {
         const skyBottomLineCalculator: SkyBottomLineCalculator = staffLine.SkyBottomLineCalculator;
         this.calculatePlacement(skyBottomLineCalculator, staffLine);
         const ep: {startX: number, startY: number, endX: number, endY: number} =
-            this.calculateStartAndEnd(slurStartNote, slurEndNote, staffLine, rules, skyBottomLineCalculator);
+            this.calculateStartAndEnd(slurStartNote, slurEndNote, staffLine, rules, skyBottomLineCalculator, true);
         const isAbove: boolean = this.placement === PlacementEnum.Above;
         const yDir: number = isAbove ? -1 : 1;
         const startY: number = ep.startY + yDir * rules.SlurNoteHeadYOffset;
@@ -208,7 +210,7 @@ export class GraphicalSlur extends GraphicalCurve {
             {
                 minT: GraphicalSlur.clearableMinT, maxT: GraphicalSlur.clearableMaxT,
                 k: GraphicalSlur.k, d: GraphicalSlur.d,
-                tangentAngleDeg: rules.SlurTangentMinAngle,
+                tangentAngleDeg: (endSL && endSL.ParentMusicSystem !== staffLine.ParentMusicSystem && !isAbove) ? 10 : rules.SlurTangentMinAngle,
                 marginPx: GraphicalSlur.injectClearanceMargin * unitInPixels,
                 slackPx: GraphicalSlur.antiBalloonSlack * unitInPixels,
                 maxBowRatio: GraphicalSlur.maxBowRatio,
@@ -590,7 +592,8 @@ export class GraphicalSlur extends GraphicalCurve {
                                     slurEndNote: GraphicalNote,
                                     staffLine: StaffLine,
                                     rules: EngravingRules,
-                                    skyBottomLineCalculator: SkyBottomLineCalculator): {startX: number, startY: number, endX: number, endY: number} {
+                                    skyBottomLineCalculator: SkyBottomLineCalculator,
+                                    atLayoutTime: boolean = false): {startX: number, startY: number, endX: number, endY: number} {
         let startX: number = 0;
         let startY: number = 0;
         let endX: number = 0;
@@ -664,11 +667,45 @@ export class GraphicalSlur extends GraphicalCurve {
                 if (breakEntry && breakEntry !== this.staffEntries[0]) {
                     endX = breakEntry.PositionAndShape.RelativePosition.x
                         + breakEntry.parentMeasure.PositionAndShape.RelativePosition.x;
-                    // Same-staff continuation: the first half ends at the slur's own
-                    // height (startY), not at the last note's height. The last note of
-                    // the system can be far below/above the slur start (e.g. a low
-                    // bass note), which would tilt the whole chord and tip the arc.
-                    endY = startY;
+                    // First half of a system-break split: end at the same stave-relative
+                    // height as the second half — the slur's end note's VF5 stave line
+                    // converted into the continuation staff's frame (`5 - topLine` +
+                    // staff offset, same computation the continuation half uses for its
+                    // endpoint), so both halves continue at a consistent level across
+                    // the break. Layout-time reservation keeps the natural bow.
+                    if (!atLayoutTime) {
+                        const vfNt: VF.StaveNote = (endGN as VexFlowGraphicalNote)?.vfnote?.[0] as VF.StaveNote;
+                        const endSL: StaffLine | undefined =
+                            endGN?.parentVoiceEntry?.parentStaffEntry?.parentMeasure?.ParentStaffLine;
+                        if (vfNt && endSL) {
+                            const kps: any[] = vfNt.getKeyProps?.() ?? [];
+                            if (kps.length > 0) {
+                                const topLine: number = Math.max(...kps.map((kp: any) => kp.line));
+                                // Continuation staffline in the end note's system (same
+                                // staff as this first half) — the height reference the
+                                // second half is drawn on.
+                                let contAbsY: number | undefined;
+                                for (const sl of endSL.ParentMusicSystem?.StaffLines ?? []) {
+                                    if (sl.ParentStaff === staffLine.ParentStaff) {
+                                        contAbsY = sl.PositionAndShape.AbsolutePosition.y;
+                                        break;
+                                    }
+                                }
+                                if (contAbsY !== undefined) {
+                                    endY = (5 - topLine)
+                                        + (endSL.PositionAndShape.AbsolutePosition.y - contAbsY);
+                                } else {
+                                    endY = startY;
+                                }
+                            } else {
+                                endY = startY;
+                            }
+                        } else {
+                            endY = startY;
+                        }
+                    } else {
+                        endY = startY;
+                    }
                     breakPointYSet = true;
                 } else {
                     endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
@@ -702,22 +739,36 @@ export class GraphicalSlur extends GraphicalCurve {
         } else {
             // Same-staff slur whose end note is not in this staffline's entries — it
             // may be in a different SYSTEM. Then this is the first half of a system-break
-            // split: stop at the system break on this staff (last entry), not at the far
-            // end note's frame. Otherwise fall back to the system edge.
+            // split: stop at the very end of this system's last measure, at a height in
+            // the inter-system gap where the second half continues. Otherwise fall back
+            // to the system edge.
             const endGN2: GraphicalNote = rules.GNote(this.slur.EndNote);
             const endSL2: StaffLine = endGN2?.parentVoiceEntry?.parentStaffEntry?.parentMeasure?.ParentStaffLine;
             if (endSL2 && endSL2.ParentMusicSystem !== staffLine.ParentMusicSystem) {
-                const breakEntry: GraphicalStaffEntry | undefined = this.lastStaffEntryOnStaffLine(staffLine);
-                if (breakEntry && breakEntry !== this.staffEntries[0]) {
-                    endX = breakEntry.PositionAndShape.RelativePosition.x
-                        + breakEntry.parentMeasure.PositionAndShape.RelativePosition.x;
-                    // Same-staff continuation: end the first half at the slur's own
-                    // height, not at the last note's height (which can tilt the chord).
-                    endY = startY;
-                    breakPointYSet = true;
+                // The system break IS the very end of this system's last measure.
+                endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
+                // At layout time the next system's Y is not final yet — reserve only
+                // the natural-bow envelope (the slur's own height). At draw time the
+                // systems are positioned: a below-placement slur drops its endpoint
+                // into the vertical middle of the gap between the systems, where the
+                // second half continues. Above-placement keeps the slur height.
+                if (!atLayoutTime && this.placement === PlacementEnum.Below) {
+                    // Below-placement first half of a system-break split: end at the
+                    // same stave-relative height as the second half (the slur's end
+                    // note in the next system), so both halves continue at a
+                    // consistent level across the system break — not deep into the
+                    // inter-system gap (that visually detaches the two halves).
+                    const endVE2: GraphicalVoiceEntry | undefined = endGN2?.parentVoiceEntry;
+                    if (endVE2) {
+                        endY = endVE2.PositionAndShape.RelativePosition.y
+                            + endVE2.PositionAndShape.BorderBottom;
+                    } else {
+                        endY = startY;
+                    }
                 } else {
-                    endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
+                    endY = startY;
                 }
+                breakPointYSet = true;
             } else {
                 endX = Math.max(staffLine.PositionAndShape.Size.width, 0);
             }
@@ -771,8 +822,19 @@ export class GraphicalSlur extends GraphicalCurve {
                 this.placement = PlacementEnum.Above;
                 return;
             }
-            // No XML direction: auto-place. Prefer above; flip below when the
-            // notes sit so high that an above arc would not fit within the staff.
+            // No XML direction: auto-place. In a polyphonic measure the slur must
+            // arc away from its companion voice: a slur on a linked (secondary)
+            // voice arcs below, one on the main voice arcs above. Without this,
+            // a low chord's slur looks "above-able" on its own line while the
+            // upper voice occupies that space (D4→F#4 under A4/C5).
+            if (this.isInMultiVoiceMeasure()) {
+                this.placement = this.isInLinkedVoice()
+                    ? PlacementEnum.Below
+                    : PlacementEnum.Above;
+                return;
+            }
+            // Prefer above; flip below when the notes sit so high that an above
+            // arc would not fit within the staff.
             this.placement = this.calculateAutoPlacement(staffLine);
             return;
         }
@@ -781,6 +843,27 @@ export class GraphicalSlur extends GraphicalCurve {
         if (this.placement !== PlacementEnum.Below) {
             this.placement = PlacementEnum.Above;
         }
+    }
+
+    /** Whether any staff entry the slur touches sits in a measure with more than
+     *  one voice (polyphonic). Mirrors the VF1 placement rule: in polyphonic
+     *  music the slur arcs away from the companion voice. */
+    private isInMultiVoiceMeasure(): boolean {
+        for (const se of this.staffEntries) {
+            if (se.parentMeasure.hasMultipleVoices()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether the slur's start or end note lives in a LinkedVoice — the
+     *  secondary voice a polyphonic staff gets for its non-first <voice>.
+     *  Such slurs arc below; the main voice's slurs arc above. */
+    private isInLinkedVoice(): boolean {
+        const inLinked: (note: Note | undefined) => boolean = (note: Note | undefined): boolean =>
+            note?.ParentVoiceEntry?.ParentVoice instanceof LinkedVoice;
+        return inLinked(this.slur.StartNote) || inLinked(this.slur.EndNote);
     }
 
     /** Minimum room above the slur's chord (staff units, top line = 0) for an

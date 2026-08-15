@@ -808,6 +808,8 @@ export class VexFlowMeasure extends GraphicalMeasure {
         }
         // Position cross-staff beams using current (draw-time) stave coordinates
         this.positionCrossStaffBeams();
+        // Regular-beam notehead collisions (issue 123) are resolved in the VexFlow
+        // Formatter postFormat pass (external/vexflow/src/formatter.ts), not here.
         // Draw beams
         for (const voiceID in this.vfbeams) {
             if (this.vfbeams.hasOwnProperty(voiceID)) {
@@ -1555,9 +1557,9 @@ export class VexFlowMeasure extends GraphicalMeasure {
                       // sit on a non-first chord note, making the OSMD NoteBeam check
                       // in shouldBeBracketed unreliable. An explicit bracket rule
                       // (TripletsBracketed/TupletsBracketed) still forces one. (issue 122)
-                      const firstVfBeam: VF.Beam = tupletStaveNotes[0]?.beam;
+                      const firstVfBeam: VF.Beam | undefined = tupletStaveNotes[0]?.getBeam?.();
                       const allOnOneVfBeam: boolean = !!firstVfBeam &&
-                          tupletStaveNotes.every(n => n.beam === firstVfBeam);
+                          tupletStaveNotes.every(n => n.getBeam() === firstVfBeam);
                       const explicitBracketRule: boolean = tuplet.TupletLabelNumber === 3
                           ? this.rules.TripletsBracketed
                           : this.rules.TupletsBracketed;

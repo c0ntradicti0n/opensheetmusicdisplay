@@ -17,6 +17,11 @@ export const SIBLING_MAX_SLOPE: number = 0.45;
 /** Max notehead-body band used for crossing detection (px). Chords' union
  *  bounds are larger than any single notehead, so the band is capped. */
 export const NOTEHEAD_BAND_MAX_PX: number = 12;
+/** Min notehead-body band for a single note (px). `getNoteHeadBounds()` returns
+ *  the chord's notehead-Y spread (0 for a single note), so the body band for a
+ *  lone notehead is floored at one staff space — otherwise the "passes below the
+ *  body" test uses a zero-width body and grazes the notehead. */
+export const NOTEHEAD_BODY_MIN_PX: number = 10;
 
 /** An obstacle in the rendered SVG-pixel frame plus provenance metadata. */
 export interface SlurObstacle extends SlurLiftObstacle {
@@ -77,7 +82,7 @@ function noteObstaclesTrusted(
     const cx: number = vfNote.getAbsoluteX() + vfNote.getGlyphWidth() / 2;
     if (cx < Math.min(ctx.startXPx, ctx.endXPx) || cx > Math.max(ctx.startXPx, ctx.endXPx)) { return; }
 
-    const bandPx: number = Math.min(bounds.yBottom - bounds.yTop, NOTEHEAD_BAND_MAX_PX);
+    const bandPx: number = Math.min(Math.max(bounds.yBottom - bounds.yTop, NOTEHEAD_BODY_MIN_PX), NOTEHEAD_BAND_MAX_PX);
     const headY: number = ctx.above ? bounds.yTop : bounds.yBottom;
     push(cx, headY, "notehead", true, ownVoice, bandPx, ctx, out);
 
@@ -169,7 +174,7 @@ export function collectSlurObstaclesStaffRelative(ctx: CollectContext): SlurObst
                 const ownVoice: boolean | undefined =
                     ctx.ownVoiceId !== undefined ? voiceId === ctx.ownVoiceId : undefined;
                 const bounds: { yTop: number, yBottom: number } = anyNote.getNoteHeadBounds();
-                const bandPx: number = Math.min(bounds.yBottom - bounds.yTop, NOTEHEAD_BAND_MAX_PX);
+                const bandPx: number = Math.min(Math.max(bounds.yBottom - bounds.yTop, NOTEHEAD_BODY_MIN_PX), NOTEHEAD_BAND_MAX_PX);
                 const x: number = vf.getAbsoluteX() + vf.getGlyphWidth() / 2 - stave.getX() + mRelX * unitInPixels;
                 if (x < Math.min(ctx.startXPx, ctx.endXPx) || x > Math.max(ctx.startXPx, ctx.endXPx)) { continue; }
 
@@ -259,32 +264,40 @@ export function collectSlurObstacles(ctx: CollectContext): SlurObstacle[] {
 }
 
 /**
- * Sibling-below fallback: VF stave Y is stale, so derive obstacle X/Y from OSMD
- * model positions (staffline-relative → page px), matching how
- * calculateStartAndEnd reconstructs a cross-staff endpoint.
+ * Sibling-below fallback. The sibling stave is positioned from the OSMD layout
+ * (AbsolutePosition), but the VF noteheads' stored bounds (getNoteHeadBounds /
+ * getYs) were computed at format time — before the sibling stave got its Y — so
+ * they are stale. The notehead Y is therefore reconstructed live: the stave's
+ * getYForNote(line) is computed from the stave's current Y, so subtracting
+ * stave.getY() yields the staff-relative notehead offset; adding the model's
+ * absolute staff Y puts it in the slur's pixel frame.
  */
 function collectModelObstacles(sib: StaffLine, ctx: CollectContext, out: SlurObstacle[]): void {
     const sibAbsX: number = sib.PositionAndShape.AbsolutePosition.x;
     const sibAbsY: number = sib.PositionAndShape.AbsolutePosition.y;
     for (const gm of sib.Measures) {
         const mRelX: number = gm.PositionAndShape?.RelativePosition?.x ?? 0;
-        const mRelY: number = gm.PositionAndShape?.RelativePosition?.y ?? 0;
         for (const gse of gm.staffEntries) {
             if (!gse.graphicalVoiceEntries) { continue; }
             const eRelX: number = gse.PositionAndShape?.RelativePosition?.x ?? 0;
             for (const gve of gse.graphicalVoiceEntries) {
+                const vf: any = (gve as VexFlowVoiceEntry).vfStaveNote;
+                if (!vf) { continue; }
+                if (vf.isRest?.()) { continue; }
                 const gveRelX: number = gve.PositionAndShape?.RelativePosition?.x ?? 0;
-                const gveRelY: number = gve.PositionAndShape?.RelativePosition?.y ?? 0;
-                const borderTop: number = (gve.PositionAndShape as any)?.BorderTop ?? 0;
-                const borderBottom: number = (gve.PositionAndShape as any)?.BorderBottom ?? 0;
                 const noteXPx: number = (sibAbsX + mRelX + eRelX + gveRelX) * unitInPixels;
-                const yBase: number = sibAbsY + mRelY + gveRelY;
-                const yPx: number = (yBase + (ctx.above ? borderTop : borderBottom)) * unitInPixels;
+                const stave: any = vf.getStave?.();
+                const kps: any[] = vf.getKeyProps?.() ?? [];
+                const line: number = kps.length > 0 ? kps[0].line : NaN;
+                if (!stave || !isFinite(line)) { continue; }
+                const centerYPx: number = stave.getYForNote(line) - stave.getY() + sibAbsY * unitInPixels;
+                const bandPx: number = Math.min(NOTEHEAD_BAND_MAX_PX, 11);
+                const headY: number = ctx.above ? centerYPx - bandPx / 2 : centerYPx + bandPx / 2;
                 const voiceId: number | undefined =
                     (gve as VexFlowVoiceEntry).parentVoiceEntry?.ParentVoice?.VoiceId;
                 const ownVoice: boolean | undefined =
                     ctx.ownVoiceId !== undefined ? voiceId === ctx.ownVoiceId : undefined;
-                push(noteXPx, yPx, "notehead", false, ownVoice, 0, ctx, out);
+                push(noteXPx, headY, "notehead", false, ownVoice, bandPx, ctx, out);
             }
         }
     }
