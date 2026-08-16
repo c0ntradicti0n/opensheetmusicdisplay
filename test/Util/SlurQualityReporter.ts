@@ -436,7 +436,7 @@ import JSZip from "jszip";
 export interface LoadedScore { calc: VexFlowMusicSheetCalculator, gms: GraphicalMusicSheet, reader: MusicSheetReader }
 
 /** Load a MusicXML/MXL score and run the layout (VexFlow calculator). */
-export async function loadScore(path: string): Promise<LoadedScore> {
+export async function loadScore(path: string, engravingRules?: Partial<EngravingRules>): Promise<LoadedScore> {
     let xmlString: string;
     if (path.endsWith(".mxl")) {
         const raw: string = TestUtils.getMXL(path);
@@ -456,6 +456,7 @@ export async function loadScore(path: string): Promise<LoadedScore> {
     const calc: VexFlowMusicSheetCalculator = new VexFlowMusicSheetCalculator(reader.rules);
     const sheet: MusicSheet = reader.createMusicSheet(new IXmlElement(partwise), path);
     const gms: GraphicalMusicSheet = new GraphicalMusicSheet(sheet, calc);
+    if (engravingRules) { Object.assign(calc.rules, engravingRules); }
     calc.calculate();
     return { calc, gms, reader };
 }

@@ -56,17 +56,21 @@ interface ScoreConfig {
     name: string;
     path: string;
     maxCpY: number;
+    /** EngravingRules applied to calc.rules before calculate() — per-item overrides. */
+    engravingRules?: Partial<EngravingRules>;
 }
 
 const SCORES: ScoreConfig[] = [
+    { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0,
+        engravingRules: { RenderSingleHorizontalStaffline: true } },
+    { name: "issue126", path: ".issue126_flag_position.musicxml", maxCpY: 8.0,
+        engravingRules: { RenderSingleHorizontalStaffline: true } },
     { name: "Land der Berge", path: "Land_der_Berge.musicxml", maxCpY: 8.0 },
     { name: "issue123", path: "issue123_strange_slur_beam_collisions.musicxml", maxCpY: 8.0 },
     { name: "issue122", path: "issue122_accents_clearing.musicxml", maxCpY: 8.0 },
     { name: "Dichterliebe", path: "Dichterliebe01.xml", maxCpY: 8.0 },
     { name: "John Field", path: ".john-field-piano-concerto-7_m318-323.mxl", maxCpY: 6.0 },
     { name: "Beethoven", path: "Beethoven_AnDieFerneGeliebte.xml", maxCpY: 6.0 },
-        { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0 },
-
 ];
 
 // ── SVG BBox helpers ─────────────────────────────────────────────────────────
@@ -835,7 +839,7 @@ describe("Debug slur obstacles", () => {
             let rulesRef: EngravingRules;
 
             beforeAll(async () => {
-                const { calc, gms } = await loadScore(cfg.path);
+                const { calc, gms } = await loadScore(cfg.path, cfg.engravingRules);
                 gmsRef = gms;
                 rulesRef = calc.rules;
                 prepareMeasures(gms);
