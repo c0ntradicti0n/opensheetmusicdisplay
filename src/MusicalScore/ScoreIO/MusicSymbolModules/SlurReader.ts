@@ -134,11 +134,15 @@ export class SlurReader {
     }
 
     /** Whether a slur stop that was read before its start (endNote) and a later start note (startNote) form a
-     * genuine cross-staff slur. A cross-staff slur written end-staff-first has its start and stop on different
-     * staves but in the SAME measure (the <backup> that reorders them is within a measure), and runs forward in
-     * time (start no later than stop). Requiring all of this rejects orphan stops - e.g. from grace-note slurs
-     * whose start is skipped by the reader - which would otherwise be wrongly paired with an unrelated later
-     * start that reuses the same slur number (across a barline and/or backwards in time). */
+     * genuine slur. The stop can be read before the start for two layouts, both kept within one measure by a
+     * <backup>: a cross-staff slur (end note's staff is written first, then the start note's staff) and a
+     * same-staff cross-voice slur (the main voice's stop is written before the secondary voice's start). Both
+     * run strictly forward in time: the start note is always earlier than the stop note, so the pairing is only
+     * accepted when start < stop. Requiring the same measure and strictly-forward time rejects orphan stops - e.g.
+     * from grace-note slurs whose start is skipped by the reader - which would otherwise be wrongly paired with an
+     * unrelated later start that reuses the same slur number. A stop and a start with equal timestamps are on the
+     * same note (a slur ending and another starting at a phrase boundary, as with grace-note slurs), never a real
+     * slur, so equality is rejected too. */
     private isCrossStaffSlurMatch(startNote: Note, endNote: Note): boolean {
         if (!startNote || !endNote) {
             return false;
@@ -148,12 +152,9 @@ export class SlurReader {
         if (!startStaffEntry || !endStaffEntry) {
             return false;
         }
-        if (startStaffEntry.ParentStaff === endStaffEntry.ParentStaff) {
-            return false; // a cross-staff slur connects two different staves
-        }
         if (startNote.SourceMeasure !== endNote.SourceMeasure) {
-            return false; // start and stop of a cross-staff slur are in the same measure
+            return false; // a stop-before-start slur is reordered within one measure
         }
-        return endStaffEntry.Timestamp.RealValue >= startStaffEntry.Timestamp.RealValue; // slur runs forward in time
+        return endStaffEntry.Timestamp.RealValue > startStaffEntry.Timestamp.RealValue; // slur runs forward in time
     }
 }

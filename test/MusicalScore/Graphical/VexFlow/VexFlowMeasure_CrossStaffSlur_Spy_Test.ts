@@ -230,4 +230,41 @@ describe("Cross-Staff Slur Spy Tests", () => {
         });
     });
 
+    describe("issue126 same-staff cross-voice slurs (stop before start)", () => {
+        let totalSlurs: number;
+        let bassSlurs: number;
+
+        beforeAll(() => {
+            const { gms, calc } = loadScore(".issue126_flag_position.musicxml");
+            prepareMeasures(gms);
+            renderToSvg(gms, calc.rules);
+            totalSlurs = 0;
+            bassSlurs = 0;
+            const pages: any[] = gms.MusicPages;
+            for (const page of pages) {
+                for (const sys of page.MusicSystems) {
+                    for (const sl of sys.StaffLines) {
+                        for (const slur of sl.GraphicalSlurs) {
+                            totalSlurs++;
+                            // ParentStaff id 2 = the bass stave (XML <staff>2</staff>)
+                            if (slur.slur.StartNote?.ParentStaffEntry?.ParentStaff?.id === 2) {
+                                bassSlurs++;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        it("renders all 5 slurs (2 bass cross-voice slurs were dropped before the fix)", () => {
+            expect(totalSlurs).to.equal(5,
+                `expected 5 slurs (3 treble + 2 bass cross-voice), got ${totalSlurs}`);
+        });
+
+        it("keeps the bass-stave slurs", () => {
+            expect(bassSlurs).to.equal(2,
+                `expected 2 bass-stave slurs, got ${bassSlurs}`);
+        });
+    });
+
 });
