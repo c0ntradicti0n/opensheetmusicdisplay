@@ -150,6 +150,7 @@ export class GraphicalSlur extends GraphicalCurve {
                 marginPx: GraphicalSlur.injectClearanceMargin * unitInPixels,
                 slackPx: GraphicalSlur.antiBalloonSlack * unitInPixels,
                 maxBowRatio: GraphicalSlur.maxBowRatio,
+                maxCpPx: GraphicalSlur.maxBowCpY * unitInPixels,
                 above: isAbove,
             },
         );
@@ -214,6 +215,7 @@ export class GraphicalSlur extends GraphicalCurve {
                 marginPx: GraphicalSlur.injectClearanceMargin * unitInPixels,
                 slackPx: GraphicalSlur.antiBalloonSlack * unitInPixels,
                 maxBowRatio: GraphicalSlur.maxBowRatio,
+                maxCpPx: GraphicalSlur.maxBowCpY * unitInPixels,
                 above: isAbove,
             },
         );
@@ -1032,6 +1034,13 @@ export class GraphicalSlur extends GraphicalCurve {
     /** Absolute bow ceiling as a fraction of chord length; trims natural-bow
      *  excess on long slurs (only above the clearance requirement). */
     public static maxBowRatio: number = 0.5;
+    /** Absolute bow ceiling (OSMD units): the CP perpendicular height never
+     *  exceeds this regardless of chord length. The natural bow is proportional
+     *  to the chord (k·tan·d ≈ 0.104·span), so a page-width slur (single-line
+     *  layout, long same-system phrase) would otherwise balloon to a
+     *  fixed-fraction depth. Yields to obstacle clearance, so notes are never
+     *  clipped — trims only cosmetic excess. */
+    public static maxBowCpY: number = 6.0;
 
     // ── Stubs for VexFlowMusicSheetDrawer ──────────────────────────────────────
 
