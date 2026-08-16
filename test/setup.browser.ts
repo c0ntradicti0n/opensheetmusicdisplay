@@ -28,6 +28,7 @@ const MUSICXML_FILES: string[] = [
   "test_slurs_highNotes.musicxml",
   "issue122_accents_clearing.musicxml",
   "issue123_strange_slur_beam_collisions.musicxml",
+  ".issue126_flag_position.musicxml",
 ];
 
 async function loadFiles(files: string[], _ext: string): Promise<void> {
