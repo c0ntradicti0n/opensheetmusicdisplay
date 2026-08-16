@@ -56,6 +56,8 @@ interface ScoreConfig {
     name: string;
     path: string;
     maxCpY: number;
+    /** File-stem interfix distinguishing render variants that share a score file (e.g. "singleline"). */
+    tag?: string;
     /** EngravingRules applied to calc.rules before calculate() — per-item overrides. */
     engravingRules?: Partial<EngravingRules>;
 }
@@ -72,6 +74,22 @@ const SCORES: ScoreConfig[] = [
     { name: "John Field", path: ".john-field-piano-concerto-7_m318-323.mxl", maxCpY: 6.0 },
     { name: "Beethoven", path: "Beethoven_AnDieFerneGeliebte.xml", maxCpY: 6.0 },
 ];
+
+/** Every issue sample is additionally rendered with the single-horizontal-staffline layout, so the slur/beam
+ * geometry is exercised under both layouts. Scores already forcing the flag (Liszt, issue126) keep just one
+ * variant. Single-line variants get a "singleline" file-stem interfix so their html doesn't clobber the
+ * multi-staffline one. */
+const SCORE_VARIANTS: ScoreConfig[] = SCORES.flatMap(cfg => {
+    if (cfg.name.toLowerCase().includes("issue") && !cfg.engravingRules?.RenderSingleHorizontalStaffline) {
+        return [cfg, {
+            ...cfg,
+            name: `${cfg.name} (single-line)`,
+            tag: "singleline",
+            engravingRules: { RenderSingleHorizontalStaffline: true },
+        }];
+    }
+    return cfg.engravingRules?.RenderSingleHorizontalStaffline ? [{ ...cfg, tag: "singleline" }] : [cfg];
+});
 
 // ── SVG BBox helpers ─────────────────────────────────────────────────────────
 
@@ -611,6 +629,7 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
     const isNode: boolean = typeof process !== "undefined" && typeof require !== "undefined";
     const envTag: string = isNode ? "jsdom" : "browser";
     const stem: string = stemFromPath(cfg.path);
+    const tagPart: string = cfg.tag ? `_${cfg.tag}` : "";
 
     const clone: SVGSVGElement = svg.cloneNode(true) as SVGSVGElement;
     const ns: string = "http://www.w3.org/2000/svg";
@@ -807,21 +826,21 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
             || path2.resolve(__dirname, "../../../../visual_regression/debug-svgs");
         if (!fs2.existsSync(baseDir)) { fs2.mkdirSync(baseDir, { recursive: true }); }
         const html: string = `<!DOCTYPE html><html><meta charset="utf-8"><body style="margin:0">${svgStr}</body></html>`;
-        fs2.writeFileSync(path2.join(baseDir, `${stem}_${envTag}.html`), html);
-        console.warn(`  ${stem}_${envTag}.html`);
+        fs2.writeFileSync(path2.join(baseDir, `${stem}${tagPart}_${envTag}.html`), html);
+        console.warn(`  ${stem}${tagPart}_${envTag}.html`);
     } else {
         (async () => {
             const html: string = `<!DOCTYPE html><html><meta charset="utf-8"><body style="margin:0">${svgStr}</body></html>`;
             try {
                 const { server: srv }: any = await import("@vitest/browser/context");
                 if (srv?.commands?.writeFile) {
-                    const outRel: string = `visual_regression/debug-svgs/${stem}_${envTag}.html`;
+                    const outRel: string = `visual_regression/debug-svgs/${stem}${tagPart}_${envTag}.html`;
                     await srv.commands.writeFile(outRel, html);
                     console.warn(`  ${outRel} (via vitest browser)`);
                     return;
                 }
             } catch (_e) { /* fallback to data URL */ }
-            console.warn(`  ${stem}_${envTag}.html data URL logged`);
+            console.warn(`  ${stem}${tagPart}_${envTag}.html data URL logged`);
         })();
     }
 }
@@ -829,7 +848,7 @@ function writeAnnotatedSvg(svg: SVGSVGElement, slurs: SlurInfo[], cfg: ScoreConf
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe("Debug slur obstacles", () => {
-    for (const cfg of SCORES) {
+    for (const cfg of SCORE_VARIANTS) {
         describe(cfg.name, () => {
             let slurs: SlurInfo[];
             let svg: SVGSVGElement | null;

@@ -457,6 +457,12 @@ export async function loadScore(path: string, engravingRules?: Partial<Engraving
     const sheet: MusicSheet = reader.createMusicSheet(new IXmlElement(partwise), path);
     const gms: GraphicalMusicSheet = new GraphicalMusicSheet(sheet, calc);
     if (engravingRules) { Object.assign(calc.rules, engravingRules); }
+    if (calc.rules.RenderSingleHorizontalStaffline) {
+        // Single-line layout = one unbroken horizontal staffline: widen the line-break
+        // threshold beyond any score's content so MusicSystemBuilder never wraps. OSMD's
+        // render() does this by setting pageWidth to SheetMaximumWidth (zoom 1.0).
+        sheet.pageWidth = calc.rules.SheetMaximumWidth / 10.0;
+    }
     calc.calculate();
     return { calc, gms, reader };
 }
