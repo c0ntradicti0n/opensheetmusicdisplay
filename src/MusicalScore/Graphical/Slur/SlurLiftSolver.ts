@@ -35,6 +35,12 @@ export interface SlurLiftOptions {
     slackPx: number;
     /** Absolute ceiling: CP perpendicular height ≤ maxBowRatio · chordLength. */
     maxBowRatio: number;
+    /** Absolute perpendicular ceiling (px), independent of chord length: the CP
+     *  height never exceeds this. The natural bow is proportional to the chord
+     *  (k·tan·d), so a very long slur would otherwise balloon to a fixed-fraction
+     *  depth. Yields to clearFloor/foreignClearNeed like the other caps. Omit to
+     *  disable (pure-ratio behavior). */
+    maxCpPx?: number;
     /** Placement side. Above = curve bows to smaller screen-Y (upwards). */
     above: boolean;
 }
@@ -171,6 +177,15 @@ export function solveSlurLift(
     // Cap 2: absolute ceiling relative to chord length; also yields to clearFloor.
     const ratioCeiling: number = Math.max(clearFloor, opts.maxBowRatio * chordLenSafe, foreignClearNeed);
     if (hCp > ratioCeiling) { hCp = ratioCeiling; }
+    // Cap 3: absolute perpendicular ceiling independent of span. The natural bow
+    // grows ∝ chord length (k·tan·d), so a page-width slur (single-line layout,
+    // long same-system phrase) would balloon with no fixed bound. Cap the CP
+    // depth at an absolute value, still yielding to clearance requirements so
+    // notes are never clipped — this trims only cosmetic excess.
+    if (opts.maxCpPx !== undefined && opts.maxCpPx > 0) {
+        const absCeiling: number = Math.max(clearFloor, opts.maxCpPx, foreignClearNeed);
+        if (hCp > absCeiling) { hCp = absCeiling; }
+    }
 
     // ── Symmetric control points in the chord frame, then rotate back. ─────────
     // Rounded-arc convention (matches legacy calculateControlPoints): the two
