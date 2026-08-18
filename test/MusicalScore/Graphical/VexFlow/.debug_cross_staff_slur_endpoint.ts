@@ -60,9 +60,12 @@ interface ScoreConfig {
     tag?: string;
     /** EngravingRules applied to calc.rules before calculate() — per-item overrides. */
     engravingRules?: Partial<EngravingRules>;
+    /** False for scores with no <slur> elements (stem/flag investigations) — skips the finds-slurs assertion. */
+    slursExpected?: boolean;
 }
 
 const SCORES: ScoreConfig[] = [
+    { name: "issue138", path: "issue138_stem_not_rendered.musicxml", maxCpY: 8.0, slursExpected: false },
     { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0,
         engravingRules: { RenderSingleHorizontalStaffline: true } },
     { name: "issue126", path: ".issue126_flag_position.musicxml", maxCpY: 8.0,
@@ -884,7 +887,7 @@ describe("Debug slur obstacles", () => {
             }, 300000); // Liszt loads + renders a multi-page score in jsdom — far beyond the 10s hook default
 
             afterAll(() => {
-                if (svg && slurs.length > 0) {
+                if (svg) {
                     try { writeAnnotatedSvg(svg, slurs, cfg); } catch (_e) { /* skip if fs unavailable */ }
                 }
             }, 300000); // writeAnnotatedSvg deep-clones the multi-MB SVG and walks it repeatedly
@@ -892,6 +895,7 @@ describe("Debug slur obstacles", () => {
             // ── Assertions ───────────────────────────────────────────────
 
             it("finds slurs", () => {
+                if (cfg.slursExpected === false) { return; }
                 expect(slurs.length).greaterThan(0,
                     `${cfg.name}: expected ≥1 slur, got ${slurs.length}`);
             });
