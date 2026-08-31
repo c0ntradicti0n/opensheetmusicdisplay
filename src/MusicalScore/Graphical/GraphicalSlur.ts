@@ -590,6 +590,32 @@ export class GraphicalSlur extends GraphicalCurve {
         return undefined;
     }
 
+    /**
+     * Horizontal offset (in staffline-relative units) moving a slur endpoint from
+     * the notehead to the stem. Returns 0 unless the stem points toward the slur
+     * (up-stem under an above-slur, down-stem under a below-slur): only then does
+     * the endpoint attach at the stem tip. The offset is note-internal geometry
+     * (getStemX and the endpoint X live in the same pixel frame), so it is
+     * identical at layout time (skyline reservation) and at draw time (final curve).
+     */
+    private static stemAttachmentXOffset(
+        vfNote: VF.StemmableNote | undefined,
+        endpointX: number,
+        staffLineAbsX: number,
+        above: boolean
+    ): number {
+        if (!vfNote || !vfNote.hasStem?.()) {
+            return 0;
+        }
+        const dir: number = vfNote.getStemDirection();
+        if (!((above && dir === 1) || (!above && dir === -1))) {
+            return 0;
+        }
+        const u: number = unitInPixels;
+        const endpointXPx: number = endpointX * u + staffLineAbsX * u;
+        return (vfNote.getStemX() - endpointXPx) / u;
+    }
+
     private calculateStartAndEnd(   slurStartNote: GraphicalNote,
                                     slurEndNote: GraphicalNote,
                                     staffLine: StaffLine,
@@ -625,6 +651,18 @@ export class GraphicalSlur extends GraphicalCurve {
                 startY = slurStartVE.PositionAndShape.RelativePosition.y + slurStartVE.PositionAndShape.BorderBottom;
             }
 
+            // Stem-side attachment: when the stem points toward the slur, the slur
+            // attaches at the stem tip — for up-stems that is to the RIGHT of the
+            // notehead, for down-stems to the LEFT. Without this the endpoint Y sits
+            // at the stem tip while X stays at the notehead, so the slur hovers
+            // beside the stem instead of on its tip.
+            startX += GraphicalSlur.stemAttachmentXOffset(
+                (slurStartNote as VexFlowGraphicalNote)?.vfnote?.[0],
+                startX,
+                staffLine.PositionAndShape.AbsolutePosition.x,
+                this.placement === PlacementEnum.Above
+            );
+
             // if (first.NoteStem !== undefined && first.NoteStem.Direction === StemEnum.StemUp && this.placement === PlacementEnum.Above) {
             //     startX += first.NoteStem.PositionAndShape.RelativePosition.x;
             //     startY = skyBottomLineCalculator.getSkyLineMinAtPoint(staffLine, startX);
@@ -648,6 +686,14 @@ export class GraphicalSlur extends GraphicalCurve {
             if (this.graceEnd) {
                 endX += slurEndNote.parentVoiceEntry.parentStaffEntry.staffEntryParent.PositionAndShape.RelativePosition.x;
             }
+
+            // Stem-side attachment (see start note above).
+            endX += GraphicalSlur.stemAttachmentXOffset(
+                (slurEndNote as VexFlowGraphicalNote)?.vfnote?.[0],
+                endX,
+                staffLine.PositionAndShape.AbsolutePosition.x,
+                this.placement === PlacementEnum.Above
+            );
 
             const slurEndVE: GraphicalVoiceEntry = slurEndNote.parentVoiceEntry;
             if (this.placement === PlacementEnum.Above) {
