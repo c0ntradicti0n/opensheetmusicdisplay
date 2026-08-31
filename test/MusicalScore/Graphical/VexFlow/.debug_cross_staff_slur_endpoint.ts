@@ -65,6 +65,7 @@ interface ScoreConfig {
 }
 
 const SCORES: ScoreConfig[] = [
+    { name: "issue181", path: "issue181_slur_up_stem.musicxml", maxCpY: 8.0 },
     { name: "issue138", path: "issue138_stem_not_rendered.musicxml", maxCpY: 8.0, slursExpected: false },
     { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0,
         engravingRules: { RenderSingleHorizontalStaffline: true } },

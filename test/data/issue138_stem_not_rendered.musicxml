@@ -1,0 +1,1390 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE score-partwise PUBLIC
+  "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+  "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano I</part-name>
+      <part-abbreviation>Pno. I</part-abbreviation>
+    </score-part>
+  </part-list>
+  <part id="P1">
+    <!--=======================================================-->
+    <measure number="1">
+      <attributes>
+        <staves>2</staves>
+        <divisions>480</divisions>
+        <key>
+          <fifths>1</fifths>
+        </key>
+        <time>
+          <beats>4</beats>
+          <beat-type>4</beat-type>
+        </time>
+        <clef number="1">
+          <sign>G</sign>
+          <line>2</line>
+        </clef>
+        <clef number="2">
+          <sign>F</sign>
+          <line>4</line>
+        </clef>
+      </attributes>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>104</per-minute>
+          </metronome>
+        </direction-type>
+        <sound tempo="104"/>
+      </direction>
+      <direction>
+        <direction-type>
+          <dynamics>
+            <p/>
+          </dynamics>
+        </direction-type>
+      </direction>
+      <print new-page="yes" new-system="yes"/>
+      <note default-x="105.72" default-y="-20.00" print-object="no" id="p0n1_3">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>960</duration>
+        <tie type="start"/>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>1</staff>
+        <notations>
+          <tied type="start"/>
+        </notations>
+        <sound dynamics="28.35"/>
+      </note>
+      <note default-x="105.72" default-y="-30.00" id="p0n1_2">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>960</duration>
+        <tie type="start"/>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>1</staff>
+        <notations>
+          <tied type="start"/>
+        </notations>
+        <sound dynamics="25.98"/>
+      </note>
+      <note default-x="105.72" default-y="-45.00" id="p0n1_1">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>960</duration>
+        <tie type="start"/>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>1</staff>
+        <notations>
+          <tied type="start"/>
+        </notations>
+        <sound dynamics="24.41"/>
+      </note>
+      <note default-x="105.72" default-y="-55.00" id="p0n1_0">
+        <chord/>
+        <pitch>
+          <step>B</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>960</duration>
+        <tie type="start"/>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>1</staff>
+        <notations>
+          <tied type="start"/>
+          <articulations>
+            <tenuto/>
+          </articulations>
+        </notations>
+        <sound dynamics="38.58"/>
+      </note>
+      <note default-x="181.14" default-y="-20.00" id="p0n1_11">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <tie type="stop"/>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <notations>
+          <tied type="stop"/>
+        </notations>
+        <sound dynamics="15.75"/>
+      </note>
+      <note default-x="181.14" default-y="-30.00" id="p0n1_10">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <tie type="stop"/>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <notations>
+          <tied type="stop"/>
+        </notations>
+        <sound dynamics="13.39"/>
+      </note>
+      <note default-x="181.14" default-y="-45.00" id="p0n1_9">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <tie type="stop"/>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <notations>
+          <tied type="stop"/>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="181.14" default-y="-55.00" id="p0n1_8">
+        <chord/>
+        <pitch>
+          <step>B</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <tie type="stop"/>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <notations>
+          <tied type="stop"/>
+        </notations>
+        <sound dynamics="17.32"/>
+      </note>
+      <note default-x="215.26" default-y="-20.00" id="p0n1_18">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="14.96"/>
+      </note>
+      <note default-x="215.26" default-y="-30.00" id="p0n1_17">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="215.26" default-y="-45.00" id="p0n1_16">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">begin</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="14.17"/>
+      </note>
+      <note default-x="249.37" default-y="-20.00" id="p0n1_23">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="249.37" default-y="-30.00" id="p0n1_22">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="249.37" default-y="-45.00" id="p0n1_21">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="283.49" default-y="-20.00" id="p0n1_28">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="283.49" default-y="-30.00" id="p0n1_27">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="283.49" default-y="-45.00" id="p0n1_26">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">end</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <backup>
+        <duration>1920</duration>
+      </backup>
+      <note default-x="105.72" default-y="-150.00" id="p0n1_7">
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>960</duration>
+        <tie type="start"/>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>2</staff>
+        <notations>
+          <tied type="start"/>
+        </notations>
+        <sound dynamics="25.20"/>
+      </note>
+      <note default-x="105.72" default-y="-165.00" id="p0n1_6">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>960</duration>
+        <tie type="start"/>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>2</staff>
+        <notations>
+          <tied type="start"/>
+        </notations>
+        <sound dynamics="23.62"/>
+      </note>
+      <note default-x="105.72" default-y="-175.00" id="p0n1_5">
+        <chord/>
+        <pitch>
+          <step>B</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>960</duration>
+        <tie type="start"/>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>2</staff>
+        <notations>
+          <tied type="start"/>
+        </notations>
+        <sound dynamics="25.98"/>
+      </note>
+      <note default-x="105.72" default-y="-185.00" id="p0n1_4">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>960</duration>
+        <tie type="start"/>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>2</staff>
+        <notations>
+          <tied type="start"/>
+        </notations>
+        <sound dynamics="40.94"/>
+      </note>
+      <note default-x="181.14" default-y="-150.00" id="p0n1_15">
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <tie type="stop"/>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <notations>
+          <tied type="stop"/>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="181.14" default-y="-165.00" id="p0n1_14">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <tie type="stop"/>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <notations>
+          <tied type="stop"/>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="181.14" default-y="-175.00" id="p0n1_13">
+        <chord/>
+        <pitch>
+          <step>B</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>240</duration>
+        <tie type="stop"/>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <notations>
+          <tied type="stop"/>
+        </notations>
+        <sound dynamics="14.96"/>
+      </note>
+      <note default-x="181.14" default-y="-185.00" id="p0n1_12">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>240</duration>
+        <tie type="stop"/>
+        <voice>5</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <notations>
+          <tied type="stop"/>
+        </notations>
+        <sound dynamics="21.26"/>
+      </note>
+      <note default-x="215.26" default-y="-140.00" id="p0n1_20">
+        <pitch>
+          <step>B</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="13.39"/>
+      </note>
+      <note default-x="215.26" default-y="-150.00" id="p0n1_19">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">begin</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="249.37" default-y="-140.00" id="p0n1_25">
+        <pitch>
+          <step>B</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="249.37" default-y="-150.00" id="p0n1_24">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="283.49" default-y="-140.00" id="p0n1_30">
+        <pitch>
+          <step>B</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="283.49" default-y="-150.00" id="p0n1_29">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">end</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+    </measure>
+    <!--=======================================================-->
+    <measure number="2">
+      <attributes>
+        <staves>2</staves>
+        <divisions>480</divisions>
+      </attributes>
+      <direction>
+        <direction-type>
+          <wedge number="1" type="crescendo"/>
+        </direction-type>
+      </direction>
+      <sound tempo="104"/>
+      <note default-x="12.00" default-y="-20.00" id="p0n2_1">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="18.11"/>
+      </note>
+      <note default-x="12.00" default-y="-30.00" id="p0n2_0">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">begin</beam>
+        <sound dynamics="14.96"/>
+      </note>
+      <note default-x="41.95" default-y="-25.00" id="p0n2_6">
+        <pitch>
+          <step>A</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="15.75"/>
+      </note>
+      <note default-x="41.95" default-y="-35.00" id="p0n2_5">
+        <chord/>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <sound dynamics="15.75"/>
+      </note>
+      <note default-x="71.91" default-y="-25.00" id="p0n2_10">
+        <pitch>
+          <step>A</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="71.91" default-y="-35.00" id="p0n2_9">
+        <chord/>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="101.86" default-y="-25.00" id="p0n2_15">
+        <pitch>
+          <step>A</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="101.86" default-y="-35.00" id="p0n2_14">
+        <chord/>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">end</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="131.82" default-y="-25.00" id="p0n2_20">
+        <pitch>
+          <step>A</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="13.39"/>
+      </note>
+      <note default-x="131.82" default-y="-35.00" id="p0n2_19">
+        <chord/>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">begin</beam>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="161.77" default-y="-20.00" id="p0n2_25">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="15.75"/>
+      </note>
+      <note default-x="161.77" default-y="-30.00" id="p0n2_24">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="191.72" default-y="-20.00" id="p0n2_29">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="191.72" default-y="-30.00" id="p0n2_28">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">continue</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="221.68" default-y="-20.00" id="p0n2_34">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <sound dynamics="13.39"/>
+      </note>
+      <note default-x="221.68" default-y="-30.00" id="p0n2_33">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">end</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <direction>
+        <direction-type>
+          <wedge number="1" type="stop"/>
+        </direction-type>
+      </direction>
+      <backup>
+        <duration>1920</duration>
+      </backup>
+      <note default-x="12.00" default-y="-45.00" id="p0n2_2">
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>2</voice>
+        <stem>down</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <sound dynamics="29.92"/>
+      </note>
+      <note default-x="71.91" default-y="-45.00" id="p0n2_11">
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>2</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">begin</beam>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="101.86" default-y="-45.00" id="p0n2_16">
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>2</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">end</beam>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="131.82" default-y="-45.00" id="p0n2_21">
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>2</voice>
+        <stem>down</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <sound dynamics="16.54"/>
+      </note>
+      <note default-x="191.72" default-y="-45.00" id="p0n2_30">
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>2</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">begin</beam>
+        <sound dynamics="16.54"/>
+      </note>
+      <note default-x="221.68" default-y="-45.00" id="p0n2_35">
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>2</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>1</staff>
+        <beam number="1">end</beam>
+        <sound dynamics="12.60"/>
+      </note>
+      <backup>
+        <duration>1920</duration>
+      </backup>
+      <note default-x="12.00" default-y="-140.00" id="p0n2_4">
+        <pitch>
+          <step>B</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="16.54"/>
+      </note>
+      <note default-x="12.00" default-y="-150.00" id="p0n2_3">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">begin</beam>
+        <sound dynamics="16.54"/>
+      </note>
+      <note default-x="41.95" default-y="-145.00" id="p0n2_8">
+        <pitch>
+          <step>A</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="17.32"/>
+      </note>
+      <note default-x="41.95" default-y="-165.00" id="p0n2_7">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <sound dynamics="21.26"/>
+      </note>
+      <note default-x="71.91" default-y="-145.00" id="p0n2_13">
+        <pitch>
+          <step>A</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="71.91" default-y="-165.00" id="p0n2_12">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="101.86" default-y="-145.00" id="p0n2_18">
+        <pitch>
+          <step>A</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="101.86" default-y="-165.00" id="p0n2_17">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">end</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="131.82" default-y="-145.00" id="p0n2_23">
+        <pitch>
+          <step>A</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="15.75"/>
+      </note>
+      <note default-x="131.82" default-y="-165.00" id="p0n2_22">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">begin</beam>
+        <sound dynamics="16.54"/>
+      </note>
+      <note default-x="161.77" default-y="-150.00" id="p0n2_27">
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="15.75"/>
+      </note>
+      <note default-x="161.77" default-y="-175.00" id="p0n2_26">
+        <chord/>
+        <pitch>
+          <step>B</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <sound dynamics="19.69"/>
+      </note>
+      <note default-x="191.72" default-y="-150.00" id="p0n2_32">
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="13.39"/>
+      </note>
+      <note default-x="191.72" default-y="-175.00" id="p0n2_31">
+        <chord/>
+        <pitch>
+          <step>B</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">continue</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="14.17"/>
+      </note>
+      <note default-x="221.68" default-y="-150.00" id="p0n2_37">
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <sound dynamics="13.39"/>
+      </note>
+      <note default-x="221.68" default-y="-175.00" id="p0n2_36">
+        <chord/>
+        <pitch>
+          <step>B</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>240</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>eighth</type>
+        <staff>2</staff>
+        <beam number="1">end</beam>
+        <notations>
+          <articulations>
+            <staccato/>
+          </articulations>
+        </notations>
+        <sound dynamics="14.17"/>
+      </note>
+    </measure>
+    <!--=======================================================-->
+    <measure number="3">
+      <attributes>
+        <staves>2</staves>
+        <divisions>480</divisions>
+      </attributes>
+      <direction placement="above">
+        <direction-type>
+          <metronome>
+            <beat-unit>quarter</beat-unit>
+            <per-minute>92</per-minute>
+          </metronome>
+        </direction-type>
+        <sound tempo="92"/>
+      </direction>
+      <note default-x="12.00" default-y="-20.00" id="p0n3_2">
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <sound dynamics="21.26"/>
+      </note>
+      <note default-x="12.00" default-y="-30.00" id="p0n3_1">
+        <chord/>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <sound dynamics="17.32"/>
+      </note>
+      <note default-x="12.00" default-y="-45.00" id="p0n3_0">
+        <chord/>
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <notations>
+          <articulations>
+            <tenuto/>
+          </articulations>
+        </notations>
+        <sound dynamics="20.47"/>
+      </note>
+      <direction>
+        <direction-type>
+          <dynamics>
+            <sf/>
+          </dynamics>
+        </direction-type>
+      </direction>
+      <note default-x="56.13" default-y="-15.00" id="p0n3_7">
+        <pitch>
+          <step>C</step>
+          <octave>5</octave>
+        </pitch>
+        <duration>960</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>1</staff>
+        <sound dynamics="25.98"/>
+      </note>
+      <note default-x="56.13" default-y="-40.00" id="p0n3_6">
+        <chord/>
+        <pitch>
+          <step>E</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>960</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>1</staff>
+        <sound dynamics="18.11"/>
+      </note>
+      <note default-x="56.13" default-y="-50.00" id="p0n3_5">
+        <chord/>
+        <pitch>
+          <step>C</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>960</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>half</type>
+        <staff>1</staff>
+        <notations>
+          <articulations>
+            <tenuto/>
+          </articulations>
+        </notations>
+        <sound dynamics="24.41"/>
+      </note>
+      <direction>
+        <direction-type>
+          <dashes number="1" type="stop"/>
+        </direction-type>
+      </direction>
+      <direction>
+        <direction-type>
+          <dynamics>
+            <p/>
+          </dynamics>
+        </direction-type>
+      </direction>
+      <direction>
+        <direction-type>
+          <wedge number="3" type="diminuendo"/>
+        </direction-type>
+      </direction>
+      <note default-x="127.69" default-y="-25.00" id="p0n3_13">
+        <pitch>
+          <step>A</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="127.69" default-y="-40.00" id="p0n3_12">
+        <chord/>
+        <pitch>
+          <step>E</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="127.69" default-y="-50.00" id="p0n3_11">
+        <chord/>
+        <pitch>
+          <step>C</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>1</voice>
+        <stem>up</stem>
+        <type>quarter</type>
+        <staff>1</staff>
+        <sound dynamics="14.17"/>
+      </note>
+      <direction>
+        <direction-type>
+          <dashes number="2" type="stop"/>
+        </direction-type>
+      </direction>
+      <direction>
+        <direction-type>
+          <wedge number="3" type="stop"/>
+        </direction-type>
+      </direction>
+      <backup>
+        <duration>1920</duration>
+      </backup>
+      <note default-x="12.00" default-y="-150.00" id="p0n3_4">
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>quarter</type>
+        <staff>2</staff>
+        <sound dynamics="20.47"/>
+      </note>
+      <note default-x="12.00" default-y="-175.00" id="p0n3_3">
+        <chord/>
+        <pitch>
+          <step>B</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>quarter</type>
+        <staff>2</staff>
+        <sound dynamics="22.83"/>
+      </note>
+      <note default-x="56.13" default-y="-145.00" id="p0n3_10">
+        <pitch>
+          <step>A</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>960</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>half</type>
+        <staff>2</staff>
+        <sound dynamics="18.90"/>
+      </note>
+      <note default-x="56.13" default-y="-160.00" id="p0n3_9">
+        <chord/>
+        <pitch>
+          <step>E</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>960</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>half</type>
+        <staff>2</staff>
+        <sound dynamics="18.90"/>
+      </note>
+      <note default-x="56.13" default-y="-180.00" id="p0n3_8">
+        <chord/>
+        <pitch>
+          <step>A</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>960</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>half</type>
+        <staff>2</staff>
+        <sound dynamics="28.35"/>
+      </note>
+      <note default-x="127.69" default-y="-145.00" id="p0n3_16">
+        <pitch>
+          <step>A</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>quarter</type>
+        <staff>2</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="127.69" default-y="-160.00" id="p0n3_15">
+        <chord/>
+        <pitch>
+          <step>E</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>quarter</type>
+        <staff>2</staff>
+        <sound dynamics="12.60"/>
+      </note>
+      <note default-x="127.69" default-y="-170.00" id="p0n3_14">
+        <chord/>
+        <pitch>
+          <step>C</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>480</duration>
+        <voice>5</voice>
+        <stem>down</stem>
+        <type>quarter</type>
+        <staff>2</staff>
+        <sound dynamics="14.17"/>
+      </note>
+    </measure>
+  </part>
+</score-partwise>
