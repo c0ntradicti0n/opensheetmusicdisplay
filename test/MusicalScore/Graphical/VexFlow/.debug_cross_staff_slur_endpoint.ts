@@ -65,6 +65,7 @@ interface ScoreConfig {
 }
 
 const SCORES: ScoreConfig[] = [
+    { name: "issue217", path: "issue217_ballooning_slur.musicxml", maxCpY: 8.0 },
     { name: "issue181", path: "issue181_slur_up_stem.musicxml", maxCpY: 8.0 },
     { name: "issue138", path: "issue138_stem_not_rendered.musicxml", maxCpY: 8.0, slursExpected: false },
     { name: "Liszt", path: ".Franz_Liszt_Transcendental_Etude_No.10_in_F_minor_Appassionata.mxl", maxCpY: 11.0,
@@ -79,20 +80,26 @@ const SCORES: ScoreConfig[] = [
     { name: "Beethoven", path: "Beethoven_AnDieFerneGeliebte.xml", maxCpY: 6.0 },
 ];
 
-/** Every issue sample is additionally rendered with the single-horizontal-staffline layout, so the slur/beam
- * geometry is exercised under both layouts. Scores already forcing the flag (Liszt, issue126) keep just one
- * variant. Single-line variants get a "singleline" file-stem interfix so their html doesn't clobber the
- * multi-staffline one. */
+/** Every issue sample and every complete piece is rendered under both the default multi-staffline layout
+ * and the single-horizontal-staffline layout, so the slur/beam geometry is exercised (and inspectable)
+ * under each. Issue repro samples that force the single-line layout for their own reason (issue126) keep
+ * just that one variant. The single-line html gets a "singleline" file-stem interfix so it doesn't clobber
+ * the multi-staffline one. */
 const SCORE_VARIANTS: ScoreConfig[] = SCORES.flatMap(cfg => {
-    if (cfg.name.toLowerCase().includes("issue") && !cfg.engravingRules?.RenderSingleHorizontalStaffline) {
-        return [cfg, {
-            ...cfg,
-            name: `${cfg.name} (single-line)`,
-            tag: "singleline",
-            engravingRules: { RenderSingleHorizontalStaffline: true },
-        }];
+    const multi: ScoreConfig = { ...cfg, engravingRules: { ...cfg.engravingRules, RenderSingleHorizontalStaffline: false } };
+    const single: ScoreConfig = {
+        ...cfg,
+        name: `${cfg.name} (single-line)`,
+        tag: "singleline",
+        engravingRules: { ...cfg.engravingRules, RenderSingleHorizontalStaffline: true },
+    };
+    if (cfg.name.toLowerCase().includes("issue") && cfg.engravingRules?.RenderSingleHorizontalStaffline) {
+        return [{ ...cfg, tag: "singleline" }]; // single-line-only repro: unchanged
     }
-    return cfg.engravingRules?.RenderSingleHorizontalStaffline ? [{ ...cfg, tag: "singleline" }] : [cfg];
+    if (cfg.name.toLowerCase().includes("issue")) {
+        return [cfg, single];
+    }
+    return [multi, single]; // complete pieces: both layouts
 });
 
 // ── SVG BBox helpers ─────────────────────────────────────────────────────────
