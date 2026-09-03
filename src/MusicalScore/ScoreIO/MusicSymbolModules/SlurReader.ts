@@ -12,8 +12,10 @@ export class SlurReader {
     private musicSheet: MusicSheet;
     private openSlurDict: { [_: number]: Slur } = {};
     /** Slur stops that were read before their matching start, kept separate from openSlurDict so they don't
-     * interfere with normal start-before-stop slurs that reuse the same slur number. See addSlur(). */
-    private openStopBeforeStartDict: { [_: number]: Slur } = {};
+     * interfere with normal start-before-stop slurs that reuse the same slur number. See addSlur().
+     * A number can accumulate several such stops within one measure (one per cross-voice phrase sharing that
+     * number), so each entry is a queue consumed in read order by the matching starts. */
+    private openStopBeforeStartDict: { [_: number]: Slur[] } = {};
     constructor(musicSheet: MusicSheet) {
         this.musicSheet = musicSheet;
     }
@@ -59,14 +61,25 @@ export class SlurReader {
                             // A cross-staff slur's stop can be read before its start: MusicXML writes the end
                             // note's staff before a <backup> and the start note's staff after it, so for e.g. a
                             // left-hand-to-right-hand slur the stop appears before the start. Such a stop was
-                            // deferred to openStopBeforeStartDict; a deferred stop is only valid for the next
-                            // start of its number, so we take and clear it here either way.
-                            const isSlur: boolean = slurNode.name === "slur";
-                            const pendingCrossStaffStop: Slur = isSlur ? this.openStopBeforeStartDict[slurNumber] : undefined;
-                            if (isSlur) {
-                                delete this.openStopBeforeStartDict[slurNumber];
+                            // deferred to openStopBeforeStartDict. Match this start to the earliest deferred
+                            // stop of its number it genuinely belongs to (same measure, running forward in
+                            // time); an unrelated stop - e.g. of another same-number phrase - is left queued
+                            // for its own start.
+                            let pendingCrossStaffStop: Slur = undefined;
+                            if (slurNode.name === "slur") {
+                                const deferredStops: Slur[] = this.openStopBeforeStartDict[slurNumber];
+                                if (deferredStops) {
+                                    const matchIndex: number = deferredStops.findIndex((stop: Slur) =>
+                                        this.isCrossStaffSlurMatch(currentNote, stop.EndNote));
+                                    if (matchIndex >= 0) {
+                                        pendingCrossStaffStop = deferredStops.splice(matchIndex, 1)[0];
+                                        if (deferredStops.length === 0) {
+                                            delete this.openStopBeforeStartDict[slurNumber];
+                                        }
+                                    }
+                                }
                             }
-                            if (pendingCrossStaffStop && this.isCrossStaffSlurMatch(currentNote, pendingCrossStaffStop.EndNote)) {
+                            if (pendingCrossStaffStop) {
                                 pendingCrossStaffStop.StartNote = currentNote;
                                 pendingCrossStaffStop.PlacementXml = slurPlacementXml;
                                 this.linkSlurToNotes(pendingCrossStaffStop);
@@ -110,7 +123,12 @@ export class SlurReader {
                                     // openSlurDict, so it can't disturb normal slurs that reuse this number.
                                     const deferredStop: Slur = new Slur();
                                     deferredStop.EndNote = currentNote;
-                                    this.openStopBeforeStartDict[slurNumber] = deferredStop;
+                                    let deferredStops: Slur[] = this.openStopBeforeStartDict[slurNumber];
+                                    if (!deferredStops) {
+                                        deferredStops = [];
+                                        this.openStopBeforeStartDict[slurNumber] = deferredStops;
+                                    }
+                                    deferredStops.push(deferredStop);
                                 }
                             }
                         }
