@@ -34,9 +34,7 @@ def _is_score_file(path: Path) -> bool:
 def normalize(input_dir: Path, output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    score_files: list[Path] = sorted(
-        p for p in input_dir.iterdir() if _is_score_file(p)
-    )
+    score_files: list[Path] = sorted(p for p in input_dir.iterdir() if _is_score_file(p))
     if not score_files:
         print(f"No score files found in {input_dir}")
         return
@@ -75,16 +73,14 @@ def normalize(input_dir: Path, output_dir: Path) -> None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Normalize score files via Partitura for visual regression"
-    )
+    parser = argparse.ArgumentParser(description="Normalize score files via Partitura for visual regression")
     default_input = Path(__file__).resolve().parents[2] / "test" / "data"
     default_output = Path(__file__).resolve().parents[2] / "test" / "data_normalized"
 
-    parser.add_argument("--input", type=Path, default=default_input,
-                        help=f"Input directory (default: {default_input})")
-    parser.add_argument("--output", type=Path, default=default_output,
-                        help=f"Output directory (default: {default_output})")
+    parser.add_argument("--input", type=Path, default=default_input, help=f"Input directory (default: {default_input})")
+    parser.add_argument(
+        "--output", type=Path, default=default_output, help=f"Output directory (default: {default_output})"
+    )
     args = parser.parse_args()
 
     normalize(args.input.resolve(), args.output.resolve())
