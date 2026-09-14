@@ -100,6 +100,10 @@ function invertBrightnessRgbHex(rgbHex: string): string {
 }
 
 export class VexFlowVoiceEntry extends GraphicalVoiceEntry {
+    /** Ceiling (OSMD units) on the bottom border a single voice entry may claim.
+     *  Generous for a stem with flags/ledger lines, far below the cross-staff beam
+     *  group extent VexFlow reports for every note of such a group. */
+    public static maxEntryBottomUnits: number = 12.0;
     private mVexFlowStaveNote: VF.StemmableNote;
     public vfGhostNotes: VF.GhostNote[]; // sometimes we need multiple ghost notes instead of just one note (vfStaveNote).
 
@@ -117,7 +121,18 @@ export class VexFlowVoiceEntry extends GraphicalVoiceEntry {
 
         this.PositionAndShape.RelativePosition.y = boundingBox.y / unitInPixels;
         this.PositionAndShape.BorderTop = 0;
-        this.PositionAndShape.BorderBottom = boundingBox.h / unitInPixels;
+        // VexFlow's bounding box for a note in a cross-staff beam group spans the
+        // whole group, down to the other staff — a single note reported 309px
+        // (30.9 units) where a note column is a few units tall. Every entry in the
+        // group reports it, so the box propagates up (entry → measure → staffline
+        // → system → page) and OSMD sizes the page from it: the rendered SVG then
+        // carries hundreds of units of empty page below the music (measured 437px
+        // of padding under a 216px-tall 5-measure excerpt), which is what stops a
+        // short excerpt from wrapping into more, larger systems.
+        // The beam's own extent is accounted for by the beam, so cap the entry at
+        // the note column it actually occupies.
+        const rawBottom: number = boundingBox.h / unitInPixels;
+        this.PositionAndShape.BorderBottom = Math.min(rawBottom, VexFlowVoiceEntry.maxEntryBottomUnits);
         const halfStavenoteWidth: number = (staveNote.width - ((staveNote as any).paddingRight ?? 0)) / 2;
         this.PositionAndShape.BorderLeft = -(modifierWidth + halfStavenoteWidth) / unitInPixels; // Left of our X origin is the modifier
         this.PositionAndShape.BorderRight = halfStavenoteWidth / unitInPixels; // Right of x origin: notehead extends right from nhBeginX
