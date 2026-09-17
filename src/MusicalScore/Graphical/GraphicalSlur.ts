@@ -1115,7 +1115,7 @@ export class GraphicalSlur extends GraphicalCurve {
      *  Generous enough that ordinary obstacle avoidance is untouched, small
      *  enough that a divergent requirement cannot balloon the curve over the
      *  systems below it. */
-    public static hardMaxBowCpY: number = 16.0;
+    public static hardMaxBowCpY: number = 5.5;
 
     // ── Stubs for VexFlowMusicSheetDrawer ──────────────────────────────────────
 

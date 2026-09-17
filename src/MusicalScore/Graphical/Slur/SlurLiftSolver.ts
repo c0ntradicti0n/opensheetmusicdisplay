@@ -200,8 +200,15 @@ export function solveSlurLift(
     // the sheet, ballooning across the systems underneath. Clearing such an
     // obstacle is impossible anyway (the curve would have to leave the page), so
     // the lift is bounded and the slur passes the note instead.
-    if (opts.hardMaxCpPx !== undefined && opts.hardMaxCpPx > 0 && hCp > opts.hardMaxCpPx) {
-        hCp = opts.hardMaxCpPx;
+    // It must still not clip a note the curve genuinely has to clear, so it
+    // yields to the OWN-voice clearance floor — but not to foreignClearNeed,
+    // which is the divergent term. A slur that needs a deep bow for its own
+    // notes (John Field) keeps it; one that is merely bowing wider than
+    // necessary (Dichterliebe, 61.5px with no obstacle asking for it) is
+    // trimmed.
+    if (opts.hardMaxCpPx !== undefined && opts.hardMaxCpPx > 0) {
+        const hardCeiling: number = Math.max(clearFloor, opts.hardMaxCpPx);
+        if (hCp > hardCeiling) { hCp = hardCeiling; }
     }
 
     // ── Symmetric control points in the chord frame, then rotate back. ─────────
