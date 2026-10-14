@@ -30,7 +30,7 @@ export class Instrument extends InstrumentalGroup {
     private id: number;
     private hasLyrics: boolean = false;
     private hasChordSymbols: boolean = false;
-    private playbackTranspose: number;
+    private playbackTranspose: number = 0;
 
     private lyricVersesNumbers: string[] = [];
     private subInstruments: SubInstrument[] = [];

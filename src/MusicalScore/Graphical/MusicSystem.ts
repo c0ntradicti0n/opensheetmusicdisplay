@@ -169,11 +169,20 @@ export abstract class MusicSystem extends GraphicalObject {
         const staffLine: StaffLine = measure.ParentStaffLine;
         const staffLineRelative: PointF2D = new PointF2D(staffLine.PositionAndShape.RelativePosition.x,
                                                          staffLine.PositionAndShape.RelativePosition.y);
-        const staves: Staff[] = staffLine.ParentStaff.ParentInstrument.Staves;
+        const instrument: Instrument = staffLine.ParentStaff.ParentInstrument;
+        const barlineGroup: InstrumentalGroup = instrument.Parent?.ConnectsBarlines ? instrument.Parent : undefined;
+        // A group whose bar lines run through (e.g. a piano written as two parts) draws one line
+        // from its top staff down to its last visible one, like the staves of one instrument
+        const staves: Staff[] = barlineGroup
+            ? barlineGroup.Instruments.flatMap((member) => (member as Instrument).Staves).filter((staff) => staff.Visible)
+            : instrument.Staves;
         if (staffLine.ParentStaff === staves[0]) {
             let bottomMeasure: GraphicalMeasure = undefined;
             if (staves.length > 1) {
-                bottomMeasure = this.getBottomStaffLine(staffLine).Measures[measureIndex];
+                const bottomStaffLine: StaffLine = barlineGroup
+                    ? this.staffLines.find((line) => line.ParentStaff === staves[staves.length - 1])
+                    : this.getBottomStaffLine(staffLine);
+                bottomMeasure = bottomStaffLine.Measures[measureIndex];
             }
             const singleVerticalLineAfterMeasure: SystemLine = this.createSystemLine(xPosition, lineWidth, lineType,
                                                                                      linePosition, this, measure, bottomMeasure);

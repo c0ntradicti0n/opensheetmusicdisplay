@@ -827,8 +827,12 @@ export class InstrumentReader {
     const transposeNode: IXmlElement = attrNode.element("transpose");
     if (transposeNode) {
       const chromaticNode: IXmlElement = transposeNode.element("chromatic");
-      if (chromaticNode) {
-        this.instrument.PlaybackTranspose = parseInt(chromaticNode.value, 10);
+      const octaveChangeNode: IXmlElement = transposeNode.element("octave-change");
+      if (chromaticNode || octaveChangeNode) {
+        // Sounding minus written pitch: chromatic steps plus whole octaves (e.g. a double bass)
+        const chromatic: number = chromaticNode ? parseInt(chromaticNode.value, 10) : 0;
+        const octaveChange: number = octaveChangeNode ? parseInt(octaveChangeNode.value, 10) : 0;
+        this.instrument.PlaybackTranspose = chromatic + 12 * octaveChange;
       }
     }
     const clefList: IXmlElement[] = attrNode.elements("clef");
@@ -1300,7 +1304,16 @@ export class InstrumentReader {
   private getNoteDurationForTuplet(xmlNode: IXmlElement): Fraction {
     const durationNode: IXmlElement = xmlNode.element("duration");
     const durationValue: number = Number.parseInt(durationNode.value, 10);
-    return new Fraction(durationValue, this.divisions * 4);
+    const fromDuration: Fraction = new Fraction(durationValue, this.divisions * 4);
+    // Exporters round a tuplet note's duration to whole divisions (a 16th of a septuplet in
+    // 480 divisions per quarter: 69 instead of 68.57), so the notes after it drift off the beat
+    // and no longer line up with the other staves. Within a division of the exact length
+    // (type, dots, actual:normal) the exact length is meant.
+    const exact: Fraction = this.getExactTupletDuration(xmlNode);
+    if (exact && Math.abs(exact.RealValue - fromDuration.RealValue) * this.divisions * 4 <= 1) {
+      return exact;
+    }
+    return fromDuration;
     // old method: calculate duration from type, tuplet normal notes etc. this was way more complex and inaccurate
     // let duration: Fraction = new Fraction(0, 1);
     // const typeDuration: Fraction = this.getNoteDurationFromTypeNode(xmlNode);
@@ -1324,6 +1337,21 @@ export class InstrumentReader {
     //   }
     // }
     // return duration;
+  }
+
+  /** A tuplet note's length from its type, dots and time-modification; undefined without them. */
+  private getExactTupletDuration(xmlNode: IXmlElement): Fraction {
+    const typeNode: IXmlElement = xmlNode.element("type");
+    const time: IXmlElement = xmlNode.element("time-modification");
+    if (!typeNode || !time?.element("actual-notes") || !time.element("normal-notes")) {
+      return undefined;
+    }
+    const actual: number = parseInt(time.element("actual-notes").value, 10);
+    const normal: number = parseInt(time.element("normal-notes").value, 10);
+    const dots: number = xmlNode.elements("dot").length;
+    const dotted: Fraction = new Fraction(2 ** (dots + 1) - 1, 2 ** dots);
+    const ratio: Fraction = new Fraction(normal, actual);
+    return Fraction.multiply(Fraction.multiply(NoteTypeHandler.getNoteDurationFromType(typeNode.value), dotted), ratio);
   }
 
   private readExpressionStaffNumber(xmlNode: IXmlElement): number {

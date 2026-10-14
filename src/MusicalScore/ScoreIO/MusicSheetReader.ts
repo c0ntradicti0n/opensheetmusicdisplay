@@ -1004,6 +1004,9 @@ export class MusicSheetReader /*implements IMusicSheetReader*/ {
                 } else {
                     if ((node.name === "part-group") && (node.attribute("type").value === "start")) {
                         const iG: InstrumentalGroup = new InstrumentalGroup("group", this.musicSheet, currentGroup);
+                        iG.GroupSymbol = node.element("group-symbol")?.value;
+                        const groupBarline: string = node.element("group-barline")?.value;
+                        iG.GroupBarline = groupBarline === undefined ? undefined : groupBarline === "yes";
                         if (currentGroup) {
                             currentGroup.InstrumentalGroups.push(iG);
                         } else {

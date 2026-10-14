@@ -12,6 +12,20 @@ export class InstrumentalGroup {
     private musicSheet: MusicSheet;
     private parent: InstrumentalGroup;
     private instrumentalGroups: InstrumentalGroup[] = [];
+    /** The part-group's <group-symbol> (brace, bracket, line, square), if any. */
+    public GroupSymbol: string;
+    /** The part-group's <group-barline>: whether bar lines run through the group; undefined if not given. */
+    public GroupBarline: boolean;
+
+    /** Bar lines run through the group: as given, else for a brace (one player, e.g. a piano as two parts). */
+    public get ConnectsBarlines(): boolean {
+        return this.GroupBarline ?? this.GroupSymbol === "brace";
+    }
+
+    /** The instruments in the group, nested groups included, in score order. */
+    public get Instruments(): InstrumentalGroup[] {
+        return this.instrumentalGroups.flatMap((group) => group.InstrumentalGroups.length > 0 ? (group as InstrumentalGroup).Instruments : [group]);
+    }
 
     public get InstrumentalGroups(): InstrumentalGroup[] {
         return this.instrumentalGroups;
