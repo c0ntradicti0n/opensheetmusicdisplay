@@ -12,6 +12,9 @@ const XML_FILES: string[] = [
 ];
 
 const MUSICXML_FILES: string[] = [
+  "issue633_ballooning_slur_and_far_too_distant.musicxml",
+  "issue638_detouched_slur_ends.musicxml",
+  "issue646_detatched_slurs_in_wrapped_layout.musicxml",
   "OSMD_function_test_chord_symbols.musicxml",
   "OSMD_function_test_drumset.musicxml",
   "OSMD_Function_Test_Tablature_Alleffects.musicxml",
