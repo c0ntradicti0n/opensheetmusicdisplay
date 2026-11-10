@@ -1152,7 +1152,10 @@ export abstract class MusicSheetCalculator {
             }
 
             // calculate TopBottom Borders for all elements recursively
-            graphicalMusicPage.PositionAndShape.calculateTopBottomBorders(); // this is where top bottom borders were originally calculated (only once)
+            //   Only the page's own borders, unless the bounding boxes below it changed since the call above: page labels only add
+            //   and position labels on the page, except for a single horizontal staffline (calculatePageLabels() recalculates them).
+            graphicalMusicPage.PositionAndShape.calculateTopBottomBorders(this.rules.RenderSingleHorizontalStaffline);
+            // (the line above is where top bottom borders were originally calculated, only once)
         }
         if (this.rules.RenderSingleHorizontalStaffline && this.rules.RebaseSingleHorizontalStaffline) {
             log.info("[MusicSheetCalculator] About to call rebaseSingleHorizontalStaffline");
