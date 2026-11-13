@@ -11,6 +11,8 @@ export class Arpeggio {
     public parentVoiceEntry: VoiceEntry;
     public notes: Note[];
     public type: ArpeggioType;
+    /** The color attribute of its arpeggiate element (as a notehead's), undefined: the default. */
+    public color: string;
 
     public addNote(note: Note): void {
         this.notes.push(note);

@@ -205,6 +205,10 @@ export class VoiceGenerator {
                 }
 
                 currentArpeggio = new Arpeggio(this.currentVoiceEntry, arpeggioType);
+                const colorAttr: Attr = arpeggioNode.attribute("color");
+                if (colorAttr) {
+                  currentArpeggio.color = colorAttr.value;
+                }
                 this.currentVoiceEntry.Arpeggio = currentArpeggio;
             }
           }

@@ -2271,6 +2271,9 @@ export class VexFlowMeasure extends GraphicalMeasure {
                     // default: false. This causes arpeggios to always go across all voices, which is often unwanted.
                     // also, this can cause infinite height of stroke, see #546
                 });
+                if (arpeggio.color) {
+                    stroke.setStyle({ fillStyle: arpeggio.color, strokeStyle: arpeggio.color });
+                }
                 //if (arpeggio.notes.length === vexFlowVoiceEntry.notes.length) { // different workaround for endless y bug
                 if (this.rules.RenderArpeggios) {
                     (voiceEntry as VexFlowVoiceEntry).vfStaveNote.addStroke(0, stroke);
