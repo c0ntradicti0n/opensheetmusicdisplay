@@ -83,6 +83,7 @@ export class ArticulationReader {
               placement = PlacementEnum.Below;
             }
             const newArticulation: Articulation = new Articulation(articulationEnum, placement);
+            newArticulation.color = childNode.attribute("color")?.value;
             // staccato should be first // necessary?
             if (name === "staccato") {
               if (currentVoiceEntry.Articulations.length > 0 &&

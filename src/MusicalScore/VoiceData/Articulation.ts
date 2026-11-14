@@ -5,6 +5,8 @@ export class Articulation {
     public placement: PlacementEnum;
     // TODO distinguish and save both placementXML and placementRendered
     public articulationEnum: ArticulationEnum;
+    /** The color attribute of its element (as a notehead's), undefined: the default. */
+    public color: string;
 
     constructor(articulationEnum: ArticulationEnum, placement: PlacementEnum) {
         this.articulationEnum = articulationEnum;

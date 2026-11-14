@@ -836,6 +836,9 @@ export class VexFlowConverter {
                 }
             }
             if (vfArt) {
+                if (articulation.color) {
+                    vfArt.setStyle({ fillStyle: articulation.color, strokeStyle: articulation.color });
+                }
                 vfArt.setPosition(vfArtPosition);
                 (vfnote as StaveNote).addModifier(vfArt, 0);
             }
