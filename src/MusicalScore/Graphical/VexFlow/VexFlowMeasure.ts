@@ -792,6 +792,25 @@ export class VexFlowMeasure extends GraphicalMeasure {
     }
 
     /**
+     * Draws the beam, naming on its group the MusicXML ids of the notes it joins (data-beam-notes): a beam
+     * clicked selects its notes.
+     */
+    private drawBeam(beam: VF.Beam, ctx: VF.RenderContext, measureNode: SVGGElement | undefined): void {
+        beam.setContext(ctx).draw();
+        const noteIds: string[] = [];
+        for (const note of beam.getNotes()) {
+            const xmlIds: Record<number, string> | undefined = (note as any)._noteXmlIds;
+            if (xmlIds) {
+                noteIds.push(...Object.values(xmlIds));
+            }
+        }
+        const beamEl: Element | null | undefined = measureNode?.querySelector(`[id="vf-${beam.getAttribute("id")}"]`);
+        if (beamEl && noteIds.length > 0) {
+            beamEl.setAttribute("data-beam-notes", noteIds.join(" "));
+        }
+    }
+
+    /**
      * Draw this measure on a VexFlow CanvasContext
      * @param ctx
      */
@@ -821,20 +840,20 @@ export class VexFlowMeasure extends GraphicalMeasure {
         for (const voiceID in this.vfbeams) {
             if (this.vfbeams.hasOwnProperty(voiceID)) {
                 for (const beam of this.vfbeams[voiceID]) {
-                    beam.setContext(ctx).draw();
+                    this.drawBeam(beam, ctx, measureNode);
                 }
             }
         }
         // Draw auto-generated beams from Beam.generateBeams()
         if (this.autoVfBeams) {
             for (const beam of this.autoVfBeams) {
-                beam.setContext(ctx).draw();
+                this.drawBeam(beam, ctx, measureNode);
             }
         }
         if (!this.isTabMeasure || this.rules.TupletNumbersInTabs) {
             if (this.autoTupletVfBeams) {
                 for (const beam of this.autoTupletVfBeams) {
-                    beam.setContext(ctx).draw();
+                    this.drawBeam(beam, ctx, measureNode);
                 }
             }
             // Draw tuplets
